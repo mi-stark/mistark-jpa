@@ -67,7 +67,7 @@ public class JpaMapperRegistry extends MapperRegistry {
         if(CollectionUtils.isEmpty(methodParsers)) return;
         methodParsers.forEach(parser -> {
             this.methodParsers.put(parser.getClass().hashCode(), parser);
-            this.methodParsers.put(parser.getClass().hashCode(), parser);
+            this.methodParsers.put(parser.getName().hashCode(), parser);
         });
     }
 }

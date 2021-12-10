@@ -6,6 +6,7 @@ import org.apache.ibatis.executor.keygen.NoKeyGenerator;
 import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.mapping.SqlSource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import java.util.stream.Collectors;
 
@@ -30,7 +31,7 @@ public class SelectList extends JpaMethodParser {
                         .collect(Collectors.joining(",")),
                 entityMeta.getTable(),
                 EntityMeta.ALIAS,
-                entityMeta.getJoins()
+                CollectionUtils.isEmpty(entityMeta.getJoins()) ? "" : entityMeta.getJoins()
                         .stream()
                         .map(j -> String.format(
                                 "%s JOIN %s %s ON %s = %s",

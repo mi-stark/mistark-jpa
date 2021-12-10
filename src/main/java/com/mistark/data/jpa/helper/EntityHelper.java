@@ -1,6 +1,6 @@
-package com.mistark.data.jpa.annotation;
+package com.mistark.data.jpa.helper;
 
-import com.mistark.data.jpa.helper.StringHelper;
+import com.mistark.data.jpa.annotation.*;
 import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
 import com.mistark.data.jpa.meta.TableJoin;
@@ -12,24 +12,20 @@ import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
 import org.springframework.core.annotation.AnnotationUtils;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.lang.reflect.WildcardType;
+import java.lang.reflect.*;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-public class EntityManager {
+public class EntityHelper {
 
     private static Map<Integer, EntityMeta> KnownMetas = new ConcurrentHashMap<>();
 
     public static EntityMeta resolve(Class entity){
+        if(entity == null) return null;
         return KnownMetas.computeIfAbsent(entity.hashCode(), k -> {
             EntityMeta meta = new EntityMeta();
             meta.setEntity(entity);
@@ -106,6 +102,7 @@ public class EntityManager {
     }
 
     public static EntityMeta fromMapper(Class mapper){
+        if(mapper == null) return null;
         return KnownMetas.computeIfAbsent(mapper.hashCode(), k-> {
             BindEntity bindEntity = AnnotationUtils.getAnnotation(mapper, BindEntity.class);
             Value<Class> entity = new Value<>();

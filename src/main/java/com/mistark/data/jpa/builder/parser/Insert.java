@@ -27,7 +27,7 @@ public class Insert extends JpaMethodParser {
         List<EntityField> fields = getFields();
         List<String> columns = fields.stream().map(f -> f.getColumn()).collect(Collectors.toList());
         List<String> values = fields.stream().map(f -> String.format("#{%s}", f.getName())).collect(Collectors.toList());
-        if(SoftDelHelper.isSoftDelete(entityMeta)){
+        if(SoftDelHelper.isSoftDel(entityMeta)){
             EntityField softDelete = entityMeta.getSoftDel();
             columns.add(softDelete.getColumn());
             values.add(String.format("'%s'", SoftDelHelper.getValue(false, softDelete.getJavaType())));

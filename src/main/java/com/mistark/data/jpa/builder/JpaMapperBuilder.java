@@ -38,7 +38,7 @@ public class JpaMapperBuilder {
             }else {
                 parser = methodParsers.get(method.getName().hashCode());
             }
-            if(parser!=null) parser.parse(configuration, assistant, method);
+            if(parser!=null) parser.parse(configuration, assistant, type, method);
         }
     }
 }

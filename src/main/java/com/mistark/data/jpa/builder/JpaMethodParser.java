@@ -2,7 +2,7 @@ package com.mistark.data.jpa.builder;
 
 
 import com.mistark.data.jpa.annotation.BindEntity;
-import com.mistark.data.jpa.annotation.EntityManager;
+import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.executor.keygen.KeyGenerator;
@@ -23,16 +23,16 @@ public abstract class JpaMethodParser {
 
     public abstract String getName();
 
-    public final void parse(Configuration configuration, MapperBuilderAssistant assistant, Method method){
+    public final void parse(Configuration configuration, MapperBuilderAssistant assistant, Class type, Method method){
         this.configuration = configuration;
         this.languageDriver = configuration.getDefaultScriptingLanguageInstance();
         this.assistant = assistant;
-        this.type = method.getDeclaringClass();
+        this.type = type;
         this.method = method;
         BindEntity bindEntity = AnnotationUtils.getAnnotation(method, BindEntity.class);
         this.entityMeta = bindEntity != null
-                ? EntityManager.resolve(bindEntity.value())
-                : EntityManager.fromMapper(this.type);
+                ? EntityHelper.resolve(bindEntity.value())
+                : EntityHelper.fromMapper(this.type);
         if(hasStatement()) return;
         buildStatement();
     }

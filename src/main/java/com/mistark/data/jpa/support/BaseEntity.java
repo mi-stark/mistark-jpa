@@ -7,8 +7,6 @@ import com.mistark.data.jpa.annotation.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.persistence.Column;
-import javax.persistence.Id;
 import java.util.Date;
 
 @Setter
@@ -49,7 +47,5 @@ public class BaseEntity {
     @SoftDel
     @JsonIgnore
     private Integer deleted;
-
-
 
 }

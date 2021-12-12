@@ -29,10 +29,7 @@ public abstract class JpaMethodParser {
         this.assistant = assistant;
         this.type = type;
         this.method = method;
-        BindEntity bindEntity = AnnotationUtils.getAnnotation(method, BindEntity.class);
-        this.entityMeta = bindEntity != null
-                ? EntityHelper.resolve(bindEntity.value())
-                : EntityHelper.fromMapper(this.type);
+        this.entityMeta = EntityHelper.fromMethod(type, method);
         if(hasStatement()) return;
         buildStatement();
     }

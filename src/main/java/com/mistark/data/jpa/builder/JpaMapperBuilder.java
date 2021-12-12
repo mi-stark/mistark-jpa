@@ -28,6 +28,7 @@ public class JpaMapperBuilder {
     public void parse(){
         if(CollectionUtils.isEmpty(methodParsers)) return;
         for (Method method : type.getMethods()) {
+            if(method.isDefault()) continue;
             BindParser bindParser = method.getAnnotation(BindParser.class);
             JpaMethodParser parser;
             if(bindParser!=null){

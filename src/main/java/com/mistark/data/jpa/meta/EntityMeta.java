@@ -9,7 +9,7 @@ import java.util.Map;
 @Setter
 @Getter
 public class EntityMeta {
-    public static String ALIAS = "T0";
+    public final static String ALIAS = "T0";
 
     private Class entity;
     private String table;

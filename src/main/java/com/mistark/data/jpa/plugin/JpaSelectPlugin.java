@@ -311,8 +311,9 @@ public class JpaSelectPlugin implements Interceptor {
     private void patchPage(SelectVars vars) throws Throwable {
         DataSource dataSource = vars.ms.getConfiguration().getEnvironment().getDataSource();
         PageDialect pageDialect = DialectHelper.getPageDialect(dataSource);
-        Value<PlainSelect> plainSelectValue = new Value<>(vars.plainSelect);
-        pageDialect.patch(vars.query.getPage(), vars.query.getPageSize(), plainSelectValue, vars.addonParams);
+        Value<PlainSelect> selectValue = new Value<>(vars.plainSelect);
+        pageDialect.patch(vars.query.getPage(), vars.query.getPageSize(), selectValue, vars.addonParams);
+        vars.plainSelect = selectValue.get();
     }
 
     private void updateBoundSql(SelectVars vars){

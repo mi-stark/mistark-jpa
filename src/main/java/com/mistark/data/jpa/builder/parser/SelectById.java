@@ -1,6 +1,7 @@
 package com.mistark.data.jpa.builder.parser;
 
 import com.mistark.data.jpa.builder.JpaMethodParser;
+import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
 import org.apache.ibatis.mapping.SqlCommandType;
@@ -33,13 +34,16 @@ public class SelectById extends JpaMethodParser {
                 EntityMeta.ALIAS,
                 CollectionUtils.isEmpty(entityMeta.getJoins()) ? "" : entityMeta.getJoins()
                         .stream()
-                        .map(j -> String.format(
-                                "%s JOIN %s %s ON %s = %s",
-                                j.getJoinType(),
-                                j.getEntityMeta().getTable(),
-                                j.getAlias(),
-                                j.getOnLeft(),
-                                j.getOnRight()))
+                        .map(j -> {
+                            EntityMeta meta = EntityHelper.resolve(j.getEntity());
+                            return String.format(
+                                    "%s JOIN %s %s ON %s = %s",
+                                    j.getJoinType(),
+                                    meta.getTable(),
+                                    j.getAlias(),
+                                    j.getOnLeft(),
+                                    j.getOnRight());
+                        })
                         .collect(Collectors.joining(" ")),
                 entityMeta.getId().getColumn(),
                 entityMeta.getId().getName());

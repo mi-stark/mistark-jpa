@@ -1,7 +1,6 @@
 package com.mistark.data.jpa.helper;
 
 import com.mistark.meta.Value;
-import net.sf.jsqlparser.JSQLParserException;
 import net.sf.jsqlparser.expression.Alias;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
@@ -16,6 +15,8 @@ import org.apache.ibatis.mapping.ParameterMapping;
 import org.springframework.util.CollectionUtils;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,14 +26,14 @@ public class SqlHelper {
     private final static String FIELD_MARK_REG = "\"#_\\{([\\S]+)\\}_#\"";
     private static long seed = 0;
 
-    public static PlainSelect getPlainSelect(String sql) throws JSQLParserException {
+    public static PlainSelect getPlainSelect(String sql) throws Throwable {
         Statement statement = CCJSqlParserUtil.parse(sql);
         PlainSelect plainSelect = (PlainSelect)((Select)statement).getSelectBody();
         return plainSelect;
     }
 
     public static Map<String, Column> getColumns(PlainSelect plainSelect) {
-        Map<String, Column> columns = new HashMap<>();
+        Map<String, Column> columns = new ConcurrentHashMap<>();
         List<SelectItem> selectItemList = plainSelect.getSelectItems();
         if(CollectionUtils.isEmpty(selectItemList)) return columns;
         selectItemList.forEach(selectItem -> {
@@ -60,9 +61,9 @@ public class SqlHelper {
     }
 
     public static String getMarkedSql(BoundSql boundSql){
-        Value<String> sql = new Value<>(boundSql.getSql());
         Collection<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
-        if(CollectionUtils.isEmpty(parameterMappings)) return sql.get();
+        if(CollectionUtils.isEmpty(parameterMappings)) return boundSql.getSql();
+        Value<String> sql = new Value<>(boundSql.getSql());
         parameterMappings.forEach(i -> sql.set(sql.get().replaceFirst("\\?", getMarkedName(i.getProperty()))));
         return sql.get();
     }
@@ -71,19 +72,9 @@ public class SqlHelper {
         return sql.replaceAll(FIELD_MARK_REG, "?");
     }
 
-    public static Iterator<String> getMarkedIterator(String sql){
+    public static void forEachMarkedField(String sql, Consumer<String> consumer){
         Pattern pattern = Pattern.compile(FIELD_MARK_REG);
         Matcher matcher = pattern.matcher(sql);
-        return new Iterator<String>() {
-            @Override
-            public boolean hasNext() {
-                return matcher.find();
-            }
-
-            @Override
-            public String next() {
-                return matcher.group(1);
-            }
-        };
+        while (matcher.find()) consumer.accept(matcher.group(1));
     }
 }

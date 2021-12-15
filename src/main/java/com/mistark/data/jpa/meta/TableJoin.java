@@ -8,7 +8,7 @@ import javax.persistence.criteria.JoinType;
 @Getter
 @Setter
 public class TableJoin {
-    private EntityMeta entityMeta;
+    private Class entity;
     private String alias;
     private String onLeft;
     private String onRight;

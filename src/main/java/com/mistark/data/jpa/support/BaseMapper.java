@@ -6,6 +6,6 @@ public interface BaseMapper<T> {
     int insert(T entity);
     int deleteById(T entity);
     int updateById(T entity);
-    List<T> selectList();
+    List<T> selectList(Object...args);
     T selectById(T entity);
 }

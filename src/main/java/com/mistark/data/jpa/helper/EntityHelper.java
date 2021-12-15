@@ -1,5 +1,6 @@
 package com.mistark.data.jpa.helper;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mistark.data.jpa.annotation.*;
 import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
@@ -46,8 +47,7 @@ public class EntityHelper {
             if(table!=null && table.joins().length > 0){
                 List<TableJoin> joins = Arrays.stream(table.joins()).map(join -> {
                     TableJoin tableJoin = new TableJoin();
-                    EntityMeta entityMeta = join.entity().equals(entity) ? meta : resolve(join.entity());
-                    tableJoin.setEntityMeta(entityMeta);
+                    tableJoin.setEntity(join.entity());
                     tableJoin.setAlias(join.alias());
                     tableJoin.setOnLeft(join.onLeft());
                     tableJoin.setOnRight(join.onRight());
@@ -97,10 +97,13 @@ public class EntityHelper {
                 if(StringUtils.isEmpty(columnTable)){
                     columnTable = EntityMeta.ALIAS;
                 }
+                JsonFormat jsonFormat = AnnotationUtils.getAnnotation(field, JsonFormat.class);
+                String pattern = jsonFormat==null ? null : jsonFormat.pattern();
                 entityField.setName(field.getName());
                 entityField.setColumn(columnName);
                 entityField.setJavaType(field.getType());
                 entityField.setTable(columnTable);
+                entityField.setPattern(pattern);
                 if(skip.get()) return;
                 fieldMap.put(entityField.getName(), entityField);
             });

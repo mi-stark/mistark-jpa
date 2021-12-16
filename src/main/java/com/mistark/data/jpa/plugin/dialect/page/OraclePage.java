@@ -1,6 +1,6 @@
 package com.mistark.data.jpa.plugin.dialect.page;
 
-import com.mistark.data.jpa.helper.SqlHelper;
+import com.mistark.data.jpa.helper.PluginHelper;
 import com.mistark.data.jpa.plugin.dialect.PageDialect;
 import com.mistark.meta.Value;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
@@ -17,16 +17,16 @@ public class OraclePage extends PageDialect {
 
     @Override
     public void patch(int page, int pageSize, Value<PlainSelect> selectValue, Map<String, Object> addon) throws Throwable {
-        PlainSelect wrapSelect = SqlHelper.getPlainSelect(TPL);
+        PlainSelect wrapSelect = PluginHelper.getPlainSelect(TPL);
         SubSelect fromItem = new SubSelect();
         fromItem.setSelectBody(selectValue.get());
         wrapSelect.getFromItem(SubSelect.class).getSelectBody(PlainSelect.class).setFromItem(fromItem);
         selectValue.set(wrapSelect);
         AndExpression and = wrapSelect.getWhere(AndExpression.class);
-        String startKey = SqlHelper.getParamName();
-        String endKey = SqlHelper.getParamName();
-        and.getLeftExpression(GreaterThan.class).setRightExpression(SqlHelper.getMarkedExpression(startKey));
-        and.getRightExpression(MinorThanEquals.class).setRightExpression(SqlHelper.getMarkedExpression(endKey));
+        String startKey = PluginHelper.getParamName();
+        String endKey = PluginHelper.getParamName();
+        and.getLeftExpression(GreaterThan.class).setRightExpression(PluginHelper.getMarkedExpression(startKey));
+        and.getRightExpression(MinorThanEquals.class).setRightExpression(PluginHelper.getMarkedExpression(endKey));
         addon.put(startKey, offset(page, pageSize));
         addon.put(endKey, uplimit(page, pageSize));
     }

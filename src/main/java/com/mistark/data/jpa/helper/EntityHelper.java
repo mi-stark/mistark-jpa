@@ -38,6 +38,10 @@ public class EntityHelper {
         return entity!=null && AnnotationUtils.getAnnotation(entity, Entity.class)!=null;
     }
 
+    public static boolean isEntity(Object obj){
+        return obj!=null && isEntity(obj.getClass());
+    }
+
     public static EntityMeta resolve(Class entity){
         if(!isEntity(entity)) return null;
         return KnownMetas.computeIfAbsent(entity.hashCode(), k -> {
@@ -180,7 +184,7 @@ public class EntityHelper {
         });
     }
 
-    public static EntityMeta fromMappedStatement(MappedStatement ms){
+    public static EntityMeta fromStatement(MappedStatement ms){
         SqlCommandType sqlCommandType = ms.getSqlCommandType();
         Class entity = null;
         switch (sqlCommandType){

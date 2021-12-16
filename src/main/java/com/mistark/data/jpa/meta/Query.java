@@ -28,16 +28,16 @@ public class Query {
     public final static String NOT_IN = "!()";
 
     @Getter
-    private final boolean safeCheck;
+    private boolean safeCheck;
     
     @Getter @Setter
     private Integer page = 1;
     @Getter @Setter
     private Integer pageSize = 10;
     @Getter @Setter
-    private List<QueryCondition> conditions = new ArrayList<>();
+    private List<QueryFilter> filters = new ArrayList<>();
     @Getter @Setter
-    private List<SortField> sorts = new ArrayList<>();
+    private List<QuerySort> sorts = new ArrayList<>();
     @Getter @Setter
     private QueryType queryType = QueryType.PAGE;
 
@@ -47,6 +47,15 @@ public class Query {
 
     public Query(boolean safeCheck) {
         this.safeCheck = safeCheck;
+    }
+
+    public Query(Query query){
+        this.page = query.getPage();
+        this.pageSize = query.getPageSize();
+        this.filters = query.getFilters();
+        this.sorts = query.getSorts();
+        this.queryType = query.getQueryType();
+        this.safeCheck = query.isSafeCheck();
     }
 
     public Query page(int page){
@@ -60,87 +69,87 @@ public class Query {
     }
 
     public Query equal(String field, Object value){
-        conditions.add(new QueryCondition(field,value, EQUAL));
+        filters.add(new QueryFilter(field,value, EQUAL));
         return this;
     }
 
     public Query notEqual(String field, Object value){
-        conditions.add(new QueryCondition(field,value, NOT_EQUAL));
+        filters.add(new QueryFilter(field,value, NOT_EQUAL));
         return this;
     }
 
     public Query greaterThan(String field, Object value){
-        conditions.add(new QueryCondition(field,value, GREATER_THAN));
+        filters.add(new QueryFilter(field,value, GREATER_THAN));
         return this;
     }
 
     public Query greaterThanOrEqual(String field, Object value){
-        conditions.add(new QueryCondition(field,value, GREATER_THAN_OR_EQUAL));
+        filters.add(new QueryFilter(field,value, GREATER_THAN_OR_EQUAL));
         return this;
     }
 
     public Query lessThan(String field, Object value){
-        conditions.add(new QueryCondition(field,value, LESS_THAN));
+        filters.add(new QueryFilter(field,value, LESS_THAN));
         return this;
     }
 
     public Query lessThanOrEqual(String field, Object value){
-        conditions.add(new QueryCondition(field,value, LESS_THAN_OR_EQUAL));
+        filters.add(new QueryFilter(field,value, LESS_THAN_OR_EQUAL));
         return this;
     }
 
     public Query between(String field, Object value){
-        conditions.add(new QueryCondition(field,value, BETWEEN));
+        filters.add(new QueryFilter(field,value, BETWEEN));
         return this;
     }
 
     public Query notBetween(String field, Object value){
-        conditions.add(new QueryCondition(field,value, NOT_BETWEEN));
+        filters.add(new QueryFilter(field,value, NOT_BETWEEN));
         return this;
     }
 
     public Query like(String field, Object value){
-        conditions.add(new QueryCondition(field,value, LIKE));
+        filters.add(new QueryFilter(field,value, LIKE));
         return this;
     }
 
     public Query likeLeft(String field, Object value){
-        conditions.add(new QueryCondition(field,value, LIKE_LEFT));
+        filters.add(new QueryFilter(field,value, LIKE_LEFT));
         return this;
     }
 
     public Query likeRight(String field, Object value){
-        conditions.add(new QueryCondition(field,value, LIKE_RIGHT));
+        filters.add(new QueryFilter(field,value, LIKE_RIGHT));
         return this;
     }
 
     public Query notLike(String field, Object value){
-        conditions.add(new QueryCondition(field,value, NOT_LIKE));
+        filters.add(new QueryFilter(field,value, NOT_LIKE));
         return this;
     }
 
     public Query isNull(String field){
-        conditions.add(new QueryCondition(field,null, IS_NULL));
+        filters.add(new QueryFilter(field,null, IS_NULL));
         return this;
     }
 
     public Query notNull(String field){
-        conditions.add(new QueryCondition(field,null, NOT_NULL));
+        filters.add(new QueryFilter(field,null, NOT_NULL));
         return this;
     }
 
     public Query in(String field, Collection<?> values){
-        conditions.add(new QueryCondition(field,values, IN));
+        filters.add(new QueryFilter(field,values, IN));
         return this;
     }
 
     public Query notIn(String field, Collection<?> values){
-        conditions.add(new QueryCondition(field,values, NOT_IN));
+        filters.add(new QueryFilter(field,values, NOT_IN));
         return this;
     }
 
     public Query and(){
-        QueryCondition condition = conditions.get(conditions.size() - 1);
+        QueryFilter condition = filters.get(filters.size() - 1);
         if(condition != null){
             condition.setLogicOperator(LogicOperator.AND);
         }
@@ -148,41 +157,49 @@ public class Query {
     }
 
     public Query or(){
-        QueryCondition condition = conditions.get(conditions.size() - 1);
+        QueryFilter condition = filters.get(filters.size() - 1);
         if(condition != null){
             condition.setLogicOperator(LogicOperator.OR);
         }
         return this;
     }
 
-    public Query parenthese(Consumer<List<QueryCondition>> action){
-        List<QueryCondition> queryConditions = new ArrayList<>();
-        action.accept(queryConditions);
-        QueryCondition condition = new QueryCondition();
-        condition.setConditions(queryConditions);
-        conditions.add(condition);
+    public Query parenthese(Consumer<List<QueryFilter>> action){
+        List<QueryFilter> queryFilters = new ArrayList<>();
+        action.accept(queryFilters);
+        QueryFilter condition = new QueryFilter();
+        condition.setGroup(queryFilters);
+        filters.add(condition);
         return this;
     }
 
     public Query orderBy(String field){
-        SortField sortField = new SortField();
-        sortField.setField(field);
-        sorts.add(sortField);
+        QuerySort querySort = new QuerySort();
+        querySort.setField(field);
+        sorts.add(querySort);
+        return this;
+    }
+
+    public Query orderBy(String field, SortOrder sortOrder){
+        QuerySort querySort = new QuerySort();
+        querySort.setField(field);
+        querySort.setOrder(sortOrder);
+        sorts.add(querySort);
         return this;
     }
 
     public Query asc(){
-        SortField sortField = sorts.get(sorts.size() - 1);
-        if(sortField != null){
-            sortField.setOrder(SortOrder.ASC);
+        QuerySort querySort = sorts.get(sorts.size() - 1);
+        if(querySort != null){
+            querySort.setOrder(SortOrder.ASC);
         }
         return this;
     }
 
     public Query desc(){
-        SortField sortField = sorts.get(sorts.size() - 1);
-        if(sortField != null){
-            sortField.setOrder(SortOrder.DESC);
+        QuerySort querySort = sorts.get(sorts.size() - 1);
+        if(querySort != null){
+            querySort.setOrder(SortOrder.DESC);
         }
         return this;
     }
@@ -197,18 +214,28 @@ public class Query {
         return this;
     }
 
+    public Query limit(int limit){
+        this.queryType = QueryType.PAGE;
+        this.page = 1;
+        this.pageSize = limit;
+        if(limit == 1){
+            this.sorts = new ArrayList<>();
+        }
+        return this;
+    }
+
     @Setter
     @Getter
-    public static class QueryCondition{
+    public static class QueryFilter{
         private String field;
         private Object value;
         private String operator = EQUAL;
         private LogicOperator logicOperator = LogicOperator.AND;
-        private List<QueryCondition> conditions;
+        private List<QueryFilter> group;
 
-        public QueryCondition(){}
+        public QueryFilter(){}
 
-        public QueryCondition(String field, Object value, String operator) {
+        public QueryFilter(String field, Object value, String operator) {
             this.field = field;
             this.value = value;
             this.operator = operator;
@@ -217,7 +244,7 @@ public class Query {
 
     @Setter
     @Getter
-    public static class SortField{
+    public static class QuerySort{
         private String field;
         private SortOrder order = SortOrder.ASC;
     }

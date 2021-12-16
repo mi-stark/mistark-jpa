@@ -12,14 +12,9 @@ import org.springframework.util.CollectionUtils;
 import java.util.stream.Collectors;
 
 @Component
-public class SelectList extends JpaMethodParser {
+public class QueryList extends JpaMethodParser {
 
     private final String TPL = "<script> SELECT %s FROM %s %s %s</script>";
-
-    @Override
-    public String getName() {
-        return "selectList";
-    }
 
     @Override
     protected void buildStatement() {

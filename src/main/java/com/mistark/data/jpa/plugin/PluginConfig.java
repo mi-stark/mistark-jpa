@@ -10,5 +10,4 @@ import lombok.Setter;
 public class PluginConfig {
     private TenantIdService tenantIdService;
     private UserIdService userIdService;
-
 }

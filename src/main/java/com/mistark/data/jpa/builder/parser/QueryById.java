@@ -12,14 +12,9 @@ import org.springframework.util.CollectionUtils;
 import java.util.stream.Collectors;
 
 @Component
-public class SelectById extends JpaMethodParser {
+public class QueryById extends JpaMethodParser {
 
     private final String TPL = "<script> SELECT %s FROM %s %s %s WHERE %s = #{%s}</script>";
-
-    @Override
-    public String getName() {
-        return "selectById";
-    }
 
     @Override
     protected void buildStatement() {

@@ -1,9 +1,14 @@
 package com.mistark.data.jpa.builder;
 
 import com.mistark.data.jpa.annotation.BindParser;
+import com.mistark.data.jpa.annotation.SoftDel;
+import com.mistark.data.jpa.helper.EntityHelper;
+import com.mistark.data.jpa.helper.SoftDelHelper;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.session.Configuration;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.lang.reflect.Method;
@@ -29,6 +34,16 @@ public class JpaMapperBuilder {
         if(CollectionUtils.isEmpty(methodParsers)) return;
         for (Method method : type.getMethods()) {
             if(method.isDefault()) continue;
+            String id = getId(type, method);
+            if(hasStatement(id)){
+                MappedStatement ms = configuration.getMappedStatement(id);
+                EntityHelper.fromStatement(ms);
+                SoftDel softDel = AnnotationUtils.getAnnotation(method, SoftDel.class);
+                if(softDel!=null){
+                    SoftDelHelper.addSoftDelStatement(ms);
+                }
+                continue;
+            }
             BindParser bindParser = method.getAnnotation(BindParser.class);
             JpaMethodParser parser;
             if(bindParser!=null){
@@ -41,5 +56,13 @@ public class JpaMapperBuilder {
             }
             if(parser!=null) parser.parse(configuration, assistant, type, method);
         }
+    }
+
+    protected String getId(Class type, Method method){
+        return String.format("%s.%s", type.getName(), method.getName());
+    }
+
+    protected boolean hasStatement(String id){
+        return configuration.hasStatement(id);
     }
 }

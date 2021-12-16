@@ -18,11 +18,6 @@ public class Insert extends JpaMethodParser {
     private String TPL = "<script> INSERT INTO %s (%s) VALUES (%s) </script>";
 
     @Override
-    public String getName() {
-        return "insert";
-    }
-
-    @Override
     protected void buildStatement() {
         List<EntityField> fields = getFields();
         List<String> columns = fields.stream().map(f -> f.getColumn()).collect(Collectors.toList());

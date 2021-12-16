@@ -4,9 +4,7 @@ import com.mistark.data.jpa.meta.EntityMeta;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.MappedStatement;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class SoftDelHelper {
@@ -29,11 +27,10 @@ public class SoftDelHelper {
         put(String.class, "N");
     }};
 
-    private static List<Integer> softDelMs = new ArrayList<>();
+    private static Set<Integer> softDelMs = new HashSet<>();
 
-    public static void addSoftDelMappedStatement(MappedStatement ms){
+    public static void addSoftDelStatement(MappedStatement ms){
         if(ms == null) return;
-        if(softDelMs.contains(ms.hashCode())) return;
         softDelMs.add(ms.hashCode());
     }
 

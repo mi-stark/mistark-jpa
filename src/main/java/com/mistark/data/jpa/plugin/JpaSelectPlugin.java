@@ -22,27 +22,19 @@ import net.sf.jsqlparser.statement.select.*;
 import org.apache.commons.beanutils.ConvertUtils;
 import org.apache.commons.beanutils.converters.DateConverter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.mapping.*;
-import org.apache.ibatis.plugin.Interceptor;
-import org.apache.ibatis.plugin.Intercepts;
-import org.apache.ibatis.plugin.Invocation;
-import org.apache.ibatis.plugin.Signature;
-import org.apache.ibatis.reflection.MetaObject;
-import org.apache.ibatis.reflection.SystemMetaObject;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
-import java.sql.Connection;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 @Component
-@Intercepts({@Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class})})
-public class JpaSelectPlugin implements Interceptor {
+@Order(PluginOrder.SELECT)
+public class JpaSelectPlugin implements JpaPlugin {
 
     @Resource
     PluginConfig pluginConfig;
@@ -85,27 +77,27 @@ public class JpaSelectPlugin implements Interceptor {
         vars.boundSql = boundSql;
         vars.params = params;
         vars.query = query;
-        vars.markedSql = SqlHelper.getMarkedSql(boundSql);
-        vars.plainSelect = SqlHelper.getPlainSelect(vars.markedSql);
-        vars.plainSelect = SqlHelper.getPlainSelect(vars.markedSql);
-        vars.columnMap = SqlHelper.getColumns(vars.plainSelect);
-        vars.entityMeta = EntityHelper.fromMappedStatement(ms);
-        vars.addonParams = new ConcurrentHashMap<>();
+        vars.markedSql = PluginHelper.getMarkedSql(boundSql);
+        vars.plainSelect = PluginHelper.getPlainSelect(vars.markedSql);
+        vars.plainSelect = PluginHelper.getPlainSelect(vars.markedSql);
+        vars.columnMap = PluginHelper.getColumns(vars.plainSelect);
+        vars.entityMeta = EntityHelper.fromStatement(ms);
+        vars.addon = new ConcurrentHashMap<>();
         return vars;
     }
 
-    private Expression parseQueryContions(List<QueryCondition> conditions,SelectVars vars, boolean isSafeCheck) throws Throwable{
-        if(CollectionUtils.isEmpty(conditions)) return null;
+    private Expression parseQueryFilters(List<QueryFilter> filters,SelectVars vars, boolean isSafeCheck) throws Throwable{
+        if(CollectionUtils.isEmpty(filters)) return null;
         Expression target = null;
         LogicOperator logicOperator = LogicOperator.AND;
-        for (QueryCondition condition : conditions) {
-            if(condition==null) continue;
+        for (QueryFilter filter : filters) {
+            if(filter==null) continue;
             Expression patch;
-            if(!CollectionUtils.isEmpty(condition.getConditions())){
-                patch = parseQueryContions(condition.getConditions(), vars, isSafeCheck);
+            if(!CollectionUtils.isEmpty(filter.getGroup())){
+                patch = parseQueryFilters(filter.getGroup(), vars, isSafeCheck);
                 patch = (patch == null) ? patch : new Parenthesis(patch);
             }else {
-                patch = parseCondition(condition, vars, isSafeCheck);
+                patch = parseFilter(filter, vars, isSafeCheck);
             }
             if(patch == null) continue;
             target = target == null
@@ -114,18 +106,18 @@ public class JpaSelectPlugin implements Interceptor {
                         ? new AndExpression(target, patch)
                         : new OrExpression(target, patch);
             logicOperator
-                    = condition.getLogicOperator()!= null
-                    ? condition.getLogicOperator()
+                    = filter.getLogicOperator()!= null
+                    ? filter.getLogicOperator()
                     : LogicOperator.AND;
         }
         return target;
     }
     
-    private Expression parseCondition(QueryCondition condition, SelectVars vars, boolean isSafeCheck) throws Throwable {
-        Value<String> field = new Value<>(condition.getField());
+    private Expression parseFilter(QueryFilter filter, SelectVars vars, boolean isSafeCheck) throws Throwable {
+        Value<String> field = new Value<>(filter.getField());
         if(field.get()!=null) field.set(field.get().trim());
         if(StringUtils.isEmpty(field.get())) return null;
-        Value<String> operator = new Value<>(condition.getOperator());
+        Value<String> operator = new Value<>(filter.getOperator());
         if(operator.get()!=null) operator.set(operator.get().trim());
         if(StringUtils.isEmpty(operator.get())) operator.set(Query.EQUAL);
         Class<? extends Expression> operatorType = QueryHelper.getExpression(operator.get());
@@ -143,9 +135,9 @@ public class JpaSelectPlugin implements Interceptor {
             if(column == null) return null;
         }
         Expression target = operatorType.newInstance();
-        Value<Class> valueJavaType = new Value<>(String.class);
-        if(field!=null) valueJavaType.set(fieldInfo.getJavaType());
-        Object value = condition.getValue();
+        Value<Class> targetType = new Value<>(String.class);
+        if(fieldInfo!=null) targetType.set(fieldInfo.getJavaType());
+        Object value = filter.getValue();
         Map<String, Object> itemValues = new HashMap<>();
         if(!(target instanceof IsNullExpression) && value == null) {
             throw new InvalidParameter("value cannot be null");
@@ -156,12 +148,12 @@ public class JpaSelectPlugin implements Interceptor {
                 if(Query.NOT_LIKE.equals(operator.get())){
                     ((LikeExpression) binaryExpression).setNot(true);
                 }
-                valueJavaType.set(String.class);
+                targetType.set(String.class);
                 value = QueryHelper.getLikeValue(operator.get(), value.toString());
             }
-            String propKey = SqlHelper.getParamName();
+            String propKey = PluginHelper.getParamName();
             binaryExpression.setLeftExpression(column);
-            binaryExpression.setRightExpression(SqlHelper.getMarkedExpression(propKey));
+            binaryExpression.setRightExpression(PluginHelper.getMarkedExpression(propKey));
             itemValues.put(propKey, value);
         }else if(target instanceof InExpression || target instanceof Between){
             if(!value.getClass().isAssignableFrom(Collection.class) && !Value.isArray(value)){
@@ -173,9 +165,9 @@ public class JpaSelectPlugin implements Interceptor {
                 in.setNot(Query.NOT_IN.equals(operator.get()));
                 List<Expression> inValues = new ArrayList<>();
                 values.forEach(v -> {
-                    String k = SqlHelper.getParamName();
+                    String k = PluginHelper.getParamName();
                     itemValues.put(k, v);
-                    inValues.add(SqlHelper.getMarkedExpression(k));
+                    inValues.add(PluginHelper.getMarkedExpression(k));
                 });
                 in.setLeftExpression(column);
                 in.setRightItemsList(new ExpressionList(inValues));
@@ -184,12 +176,12 @@ public class JpaSelectPlugin implements Interceptor {
                     throw new InvalidParameter(String.format("operator \"%s\" requires two items", operator.get()));
                 }
                 Between between = (Between)target;
-                String startKey = SqlHelper.getParamName();
-                String endKey = SqlHelper.getParamName();
+                String startKey = PluginHelper.getParamName();
+                String endKey = PluginHelper.getParamName();
                 between.setLeftExpression(column);
                 between.setNot(Query.NOT_BETWEEN.equals(operator.get()));
-                between.setBetweenExpressionStart(SqlHelper.getMarkedExpression(startKey));
-                between.setBetweenExpressionEnd(SqlHelper.getMarkedExpression(endKey));
+                between.setBetweenExpressionStart(PluginHelper.getMarkedExpression(startKey));
+                between.setBetweenExpressionEnd(PluginHelper.getMarkedExpression(endKey));
                 Object[] btValues = values.toArray();
                 itemValues.put(startKey, btValues[0]);
                 itemValues.put(endKey, btValues[1]);
@@ -201,7 +193,7 @@ public class JpaSelectPlugin implements Interceptor {
         }
         itemValues.entrySet().forEach(entry -> {
             Object val = entry.getValue();
-            Class toType = valueJavaType.get();
+            Class toType = targetType.get();
             if(val!=null && toType != null && !toType.isAssignableFrom(val.getClass())){
                 if(toType.isAssignableFrom(Date.class)){
                     String pattern =
@@ -214,7 +206,7 @@ public class JpaSelectPlugin implements Interceptor {
                     val = ConvertUtils.convert(val, toType);
                 }
             }
-            vars.addonParams.put(entry.getKey(), val);
+            vars.addon.put(entry.getKey(), val);
         });
         return target;
     }
@@ -246,9 +238,9 @@ public class JpaSelectPlugin implements Interceptor {
             column.setColumnName(entityMeta.getSoftDel().getColumn());
             EqualsTo equalsTo = new EqualsTo();
             equalsTo.setLeftExpression(column);
-            String key = SqlHelper.getParamName();
-            vars.addonParams.put(key, SoftDelHelper.getValue(false, entityMeta.getSoftDel().getJavaType()));
-            equalsTo.setRightExpression(SqlHelper.getMarkedExpression(key));
+            String key = PluginHelper.getParamName();
+            vars.addon.put(key, SoftDelHelper.getValue(false, entityMeta.getSoftDel().getJavaType()));
+            equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
             target = target == null ? equalsTo : new AndExpression(target, equalsTo);
         }
         return target;
@@ -267,9 +259,9 @@ public class JpaSelectPlugin implements Interceptor {
             column.setColumnName(entityMeta.getTenantId().getColumn());
             EqualsTo equalsTo = new EqualsTo();
             equalsTo.setLeftExpression(column);
-            String key = SqlHelper.getParamName();
-            vars.addonParams.put(key, tenantIdService.getTenantId());
-            equalsTo.setRightExpression(SqlHelper.getMarkedExpression(key));
+            String key = PluginHelper.getParamName();
+            vars.addon.put(key, tenantIdService.getTenantId());
+            equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
             target = target == null ? equalsTo : new AndExpression(target, equalsTo);
         }
         return target;
@@ -277,17 +269,17 @@ public class JpaSelectPlugin implements Interceptor {
 
     void patchWhere(SelectVars vars) throws Throwable {
         PlainSelect plainSelect = vars.plainSelect;
-        List<Expression> conditions = new ArrayList<>();
-        conditions.add(plainSelect.getWhere());
+        List<Expression> whereItems = new ArrayList<>();
+        whereItems.add(plainSelect.getWhere());
         Query query = vars.query;
         if(query!=null){
-            conditions.add(parseQueryContions(query.getConditions(), vars, query.isSafeCheck()));
+            whereItems.add(parseQueryFilters(query.getFilters(), vars, query.isSafeCheck()));
         }
         List<Table> tables = getTables(vars.plainSelect);
-        conditions.add(parseSoftDel(tables, vars));
-        conditions.add(parseTenant(tables, vars));
+        whereItems.add(parseSoftDel(tables, vars));
+        whereItems.add(parseTenant(tables, vars));
         Expression target = plainSelect.getWhere();
-        for (Expression exp:conditions){
+        for (Expression exp : whereItems){
             if(exp==null) continue;
             exp = new Parenthesis(exp);
             target = target==null ? exp : new AndExpression(target, exp);
@@ -312,35 +304,18 @@ public class JpaSelectPlugin implements Interceptor {
         DataSource dataSource = vars.ms.getConfiguration().getEnvironment().getDataSource();
         PageDialect pageDialect = DialectHelper.getPageDialect(dataSource);
         Value<PlainSelect> selectValue = new Value<>(vars.plainSelect);
-        pageDialect.patch(vars.query.getPage(), vars.query.getPageSize(), selectValue, vars.addonParams);
+        pageDialect.patch(vars.query.getPage(), vars.query.getPageSize(), selectValue, vars.addon);
         vars.plainSelect = selectValue.get();
     }
 
-    private void updateBoundSql(SelectVars vars){
-        Map<String, ParameterMapping> pre = new HashMap<>();
-        PlainSelect plainSelect = vars.plainSelect;
-        BoundSql boundSql = vars.boundSql;
-        boundSql.getParameterMappings().forEach(i -> pre.put(i.getProperty(), i));
-        String sql = plainSelect.toString();
-        List<ParameterMapping> parameterMappings = new ArrayList<>();
-        SqlHelper.forEachMarkedField(sql, prop -> {
-            ParameterMapping parameterMapping = pre.get(prop);
-            if(parameterMapping==null){
-                Object value = vars.addonParams.get(prop);
-                boundSql.setAdditionalParameter(prop, value);
-                Class valueType = value!=null ? value.getClass() : Object.class;
-                parameterMapping = new ParameterMapping.Builder(vars.ms.getConfiguration(), prop, valueType).build();
-            }
-            parameterMappings.add(parameterMapping);
-        });
-        sql = SqlHelper.getUnMarkedSql(sql);
-        MetaObject metaObject = SystemMetaObject.forObject(boundSql);
-        metaObject.setValue("sql", sql);
-        metaObject.setValue("parameterMappings", parameterMappings);
+    @Override
+    public boolean match(MappedStatement ms, BoundSql boundSql) {
+        return ms.getSqlCommandType() == SqlCommandType.SELECT
+                && ms.getStatementType()!=StatementType.CALLABLE;
     }
 
-
-    private void patch(MappedStatement ms, BoundSql boundSql) throws Throwable {
+    @Override
+    public void patch(MappedStatement ms, BoundSql boundSql) throws Throwable {
         SelectVars vars = getVars(ms, boundSql);
         patchWhere(vars);
         Query query = vars.query;
@@ -352,32 +327,19 @@ public class JpaSelectPlugin implements Interceptor {
                 patchPage(vars);
             }
         }
-        updateBoundSql(vars);
-        System.out.println(vars.boundSql.getSql());
-    }
-
-    @Override
-    public Object intercept(Invocation invocation) throws Throwable {
-        StatementHandler statementHandler = (StatementHandler) invocation.getTarget();
-        MappedStatement ms = PluginHelper.getMappedStatement(statementHandler);
-        BoundSql boundSql = statementHandler.getBoundSql();
-        if(ms.getSqlCommandType() == SqlCommandType.SELECT
-                || ms.getStatementType()!= StatementType.CALLABLE){
-            patch(ms, boundSql);
-        }
-        return invocation.proceed();
+        PluginHelper.updateBoundSql(vars.ms, vars.boundSql, vars.plainSelect.toString(), vars.addon);
     }
 
     private class SelectVars {
-        private Map<Class, Object> params;
         private MappedStatement ms;
         private BoundSql boundSql;
+        private Map<Class, Object> params;
         private Query query;
         private String markedSql;
         private PlainSelect plainSelect;
         private Map<String, Column> columnMap;
         private EntityMeta entityMeta;
-        private Map<String, Object> addonParams;
+        private Map<String, Object> addon;
     }
 
 }

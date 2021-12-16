@@ -1,7 +1,6 @@
 package com.mistark.data.jpa.builder;
 
 
-import com.mistark.data.jpa.annotation.BindEntity;
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -9,7 +8,6 @@ import org.apache.ibatis.executor.keygen.KeyGenerator;
 import org.apache.ibatis.mapping.*;
 import org.apache.ibatis.scripting.LanguageDriver;
 import org.apache.ibatis.session.Configuration;
-import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Method;
 
@@ -21,8 +19,6 @@ public abstract class JpaMethodParser {
     protected Method method;
     protected EntityMeta entityMeta;
 
-    public abstract String getName();
-
     public final void parse(Configuration configuration, MapperBuilderAssistant assistant, Class type, Method method){
         this.configuration = configuration;
         this.languageDriver = configuration.getDefaultScriptingLanguageInstance();
@@ -30,16 +26,11 @@ public abstract class JpaMethodParser {
         this.type = type;
         this.method = method;
         this.entityMeta = EntityHelper.fromMethod(type, method);
-        if(hasStatement()) return;
         buildStatement();
     }
 
     protected String getId(){
         return String.format("%s.%s", type.getName(), method.getName());
-    }
-
-    protected boolean hasStatement(){
-        return configuration.hasStatement(getId());
     }
 
     protected abstract void buildStatement();

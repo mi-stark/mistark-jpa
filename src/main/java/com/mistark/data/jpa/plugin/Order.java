@@ -1,11 +1,12 @@
-package com.mistark.data.jpa.annotation;
+package com.mistark.data.jpa.plugin;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target({ElementType.FIELD, ElementType.METHOD})
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SoftDel {
+public @interface Order {
+    int value() default 0;
 }

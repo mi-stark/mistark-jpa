@@ -14,11 +14,6 @@ public class DeleteById extends JpaMethodParser {
     private String SOFT_DEL_TPL = "<script> UPDATE %s SET %s = '%s' WHERE %s = #{%s} AND %s = '%s' </script>";
 
     @Override
-    public String getName() {
-        return "deleteById";
-    }
-
-    @Override
     protected void buildStatement() {
         String script;
         boolean isSoft = SoftDelHelper.isSoftDel(entityMeta);
@@ -51,6 +46,6 @@ public class DeleteById extends JpaMethodParser {
                 null,
                 null
         );
-        if(isSoft) SoftDelHelper.addSoftDelMappedStatement(ms);
+        if(isSoft) SoftDelHelper.addSoftDelStatement(ms);
     }
 }

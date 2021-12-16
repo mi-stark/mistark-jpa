@@ -4,12 +4,15 @@ import com.mistark.data.jpa.binding.JpaMapperMethodFactory;
 import com.mistark.data.jpa.binding.JpaMapperRegistry;
 import com.mistark.data.jpa.builder.JpaMethodParser;
 import com.mistark.data.jpa.plugin.PluginConfig;
+import com.mistark.data.jpa.support.IdGenerator;
+import com.mistark.data.jpa.support.SnowFlake;
 import com.mistark.data.jpa.support.TenantIdService;
 import com.mistark.data.jpa.support.UserIdService;
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
 import org.mybatis.spring.boot.autoconfigure.ConfigurationCustomizer;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -52,6 +55,12 @@ public class MistarkJpaAutoConfiguration {
         pluginConfig.setUserIdService(this.userIdService);
         pluginConfig.setTenantIdService(this.tenantIdService);
         return pluginConfig;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(IdGenerator.class)
+    public IdGenerator idGenerator(){
+        return new SnowFlake();
     }
 
 }

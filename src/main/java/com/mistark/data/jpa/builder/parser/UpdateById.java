@@ -16,11 +16,6 @@ public class UpdateById extends JpaMethodParser {
     private String TPL = "<script> UPDATE %s <set>%s</set> WHERE %s = #{%s} </script>";
 
     @Override
-    public String getName() {
-        return "updateById";
-    }
-
-    @Override
     protected void buildStatement() {
         String script = String.format(
                 TPL,

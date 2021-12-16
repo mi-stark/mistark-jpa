@@ -18,33 +18,35 @@ public class BaseEntity {
     @JsonString
     private Long id;
 
-    @Column
     @TenantId
+    @Column
     @JsonIgnore
     private Long tenantId;
 
-    @Column
     @CreateBy
+    @Column
+    @JsonString
     private Long createBy;
 
-    @Column
     @CreateDate
+    @Column
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date createDate;
 
-    @Column
     @UpdateBy
+    @Column
+    @JsonString
     private Long updateBy;
 
-    @Column
     @UpdateDate
+    @Column
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date updateDate;
 
-    @Column
     @SoftDel
+    @Column
     @JsonIgnore
     private Integer deleted;
 

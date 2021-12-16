@@ -10,6 +10,7 @@ import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
 import org.apache.ibatis.session.Configuration;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -67,7 +68,8 @@ public class JpaMapperRegistry extends MapperRegistry {
         if(CollectionUtils.isEmpty(methodParsers)) return;
         methodParsers.forEach(parser -> {
             this.methodParsers.put(parser.getClass().hashCode(), parser);
-            this.methodParsers.put(parser.getName().hashCode(), parser);
+            String name = StringUtils.uncapitalize(parser.getClass().getSimpleName());
+            this.methodParsers.put(name.hashCode(), parser);
         });
     }
 }

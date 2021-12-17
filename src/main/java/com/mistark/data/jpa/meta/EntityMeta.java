@@ -1,7 +1,11 @@
 package com.mistark.data.jpa.meta;
 
+
+import com.mistark.data.jpa.annotation.SortType;
 import lombok.Getter;
 import lombok.Setter;
+
+import javax.persistence.criteria.JoinType;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -17,6 +21,7 @@ public class EntityMeta {
     private Class entity;
     private String table;
     private List<TableJoin> joins;
+    private List<TableOrderBy> orderBys;
     private EntityField id;
     private EntityField createBy;
     private EntityField createDate;
@@ -39,4 +44,30 @@ public class EntityMeta {
         return softDel!=null;
     }
 
+    @Setter
+    @Getter
+    public static class EntityField {
+        private String name;
+        private String column;
+        private String table;
+        private Class<?> javaType;
+        private String pattern;
+    }
+
+    @Getter
+    @Setter
+    public static class TableJoin {
+        private Class entity;
+        private String alias;
+        private String onLeft;
+        private String onRight;
+        private JoinType joinType;
+    }
+
+    @Getter
+    @Setter
+    public static class TableOrderBy {
+        private String field;
+        private SortType sortType;
+    }
 }

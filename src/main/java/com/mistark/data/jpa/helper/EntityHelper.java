@@ -2,9 +2,8 @@ package com.mistark.data.jpa.helper;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mistark.data.jpa.annotation.*;
-import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
-import com.mistark.data.jpa.meta.TableJoin;
+import com.mistark.data.jpa.meta.EntityMeta.*;
 import com.mistark.meta.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -17,9 +16,7 @@ import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,18 +44,29 @@ public class EntityHelper {
         return KnownMetas.computeIfAbsent(entity.hashCode(), k -> {
             EntityMeta meta = new EntityMeta();
             meta.setEntity(entity);
+            Map<String, TableOrderBy> orderByMap = new HashMap<>();
             Table table = AnnotationUtils.getAnnotation(entity, Table.class);
-            if(table!=null && table.joins().length > 0){
-                List<TableJoin> joins = Arrays.stream(table.joins()).map(join -> {
-                    TableJoin tableJoin = new TableJoin();
-                    tableJoin.setEntity(join.entity());
-                    tableJoin.setAlias(join.alias());
-                    tableJoin.setOnLeft(join.onLeft());
-                    tableJoin.setOnRight(join.onRight());
-                    tableJoin.setJoinType(join.joinType());
-                    return tableJoin;
-                }).collect(Collectors.toList());
-                meta.setJoins(joins);
+            if(table!=null){
+                if(table.joins().length > 0){
+                    List<TableJoin> joins = Arrays.stream(table.joins()).map(join -> {
+                        TableJoin tableJoin = new TableJoin();
+                        tableJoin.setEntity(join.entity());
+                        tableJoin.setAlias(join.alias());
+                        tableJoin.setOnLeft(join.onLeft());
+                        tableJoin.setOnRight(join.onRight());
+                        tableJoin.setJoinType(join.joinType());
+                        return tableJoin;
+                    }).collect(Collectors.toList());
+                    meta.setJoins(joins);
+                }
+                if(table.orderBys().length > 0){
+                    Arrays.stream(table.orderBys()).forEach(orderBy -> {
+                        TableOrderBy tableOrderBy = new TableOrderBy();
+                        tableOrderBy.setField(orderBy.name());
+                        tableOrderBy.setSortType(orderBy.sortType());
+                        orderByMap.put(tableOrderBy.getField(), tableOrderBy);
+                    });
+                }
             }
             String tableName = table!=null ? table.name().trim() : null;
             if(StringUtils.isEmpty(tableName)){
@@ -101,6 +109,13 @@ public class EntityHelper {
                 }
                 JsonFormat jsonFormat = AnnotationUtils.getAnnotation(field, JsonFormat.class);
                 String pattern = jsonFormat==null ? null : jsonFormat.pattern();
+                OrderBy orderBy = AnnotationUtils.getAnnotation(field, OrderBy.class);
+                if(orderBy!=null && !orderByMap.containsKey(field.getName())){
+                    TableOrderBy tableOrderBy = new TableOrderBy();
+                    tableOrderBy.setSortType(orderBy.sortType());
+                    tableOrderBy.setField(field.getName());
+                    orderByMap.put(tableOrderBy.getField(), tableOrderBy);
+                }
                 entityField.setName(field.getName());
                 entityField.setColumn(columnName);
                 entityField.setJavaType(field.getType());
@@ -114,6 +129,9 @@ public class EntityHelper {
                 throw new BuilderException("primary key id and soft delete flag cannot be the same field");
             }
             if(meta.getId()==null) meta.setId(meta.resolve(EntityMeta.ID_KEY_DEFAULT));
+            if(orderByMap.size()>0){
+                meta.setOrderBys(orderByMap.values().stream().collect(Collectors.toList()));
+            }
             return meta;
         });
     }

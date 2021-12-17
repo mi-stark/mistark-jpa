@@ -1,6 +1,7 @@
 package com.mistark.data.jpa.helper;
 
 import com.mistark.data.jpa.meta.EntityMeta;
+import com.mistark.data.jpa.meta.EntityMeta.*;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.MappedStatement;
 

@@ -50,6 +50,7 @@ public class MistarkJpaAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(PluginConfig.class)
     public PluginConfig pluginConfig(){
         PluginConfig pluginConfig = new PluginConfig();
         pluginConfig.setUserIdService(this.userIdService);

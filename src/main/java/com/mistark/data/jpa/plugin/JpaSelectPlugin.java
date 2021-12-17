@@ -2,8 +2,8 @@ package com.mistark.data.jpa.plugin;
 
 import com.mistark.data.jpa.annotation.SortType;
 import com.mistark.data.jpa.helper.*;
-import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
+import com.mistark.data.jpa.meta.EntityMeta.*;
 import com.mistark.data.jpa.meta.Query;
 import com.mistark.data.jpa.meta.Query.*;
 import com.mistark.data.jpa.plugin.dialect.PageDialect;

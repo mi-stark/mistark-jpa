@@ -1,8 +1,12 @@
 package com.mistark.data.jpa.builder;
 
+import com.mistark.data.jpa.annotation.SortType;
 import com.mistark.data.jpa.helper.EntityHelper;
-import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
+import com.mistark.data.jpa.meta.EntityMeta.*;
+import net.sf.jsqlparser.schema.Column;
+import net.sf.jsqlparser.statement.select.OrderByElement;
+import net.sf.jsqlparser.statement.select.PlainSelect;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -36,6 +40,22 @@ public class ParserHelper {
                             j.getOnRight());
                 })
                 .collect(Collectors.joining(" "));
+    }
+
+    public static String getOrderByItems(EntityMeta meta){
+        if(CollectionUtils.isEmpty(meta.getOrderBys())) return "";
+        List<OrderByElement> orderByElements = meta.getOrderBys()
+                .stream()
+                .map(j -> {
+                    EntityField field = meta.resolve(j.getField());
+                    Column column = new Column(String.format("%s.%s", field.getTable(), field.getColumn()));
+                    OrderByElement orderByElement = new OrderByElement();
+                    orderByElement.setExpression(column);
+                    orderByElement.setAsc(j.getSortType() == SortType.ASC);
+                    return orderByElement;
+                })
+                .collect(Collectors.toList());
+        return PlainSelect.orderByToString(orderByElements).trim();
     }
 
     public static boolean isInsertExclude(EntityField f, EntityMeta meta){

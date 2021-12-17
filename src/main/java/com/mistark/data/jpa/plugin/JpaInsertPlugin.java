@@ -2,8 +2,8 @@ package com.mistark.data.jpa.plugin;
 
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.helper.SoftDelHelper;
-import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
+import com.mistark.data.jpa.meta.EntityMeta.*;
 import com.mistark.data.jpa.support.IdGenerator;
 import com.mistark.meta.time.Clock;
 import org.apache.commons.beanutils.ConvertUtils;

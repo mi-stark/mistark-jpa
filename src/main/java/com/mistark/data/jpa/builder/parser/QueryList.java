@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class QueryList extends JpaMethodParser {
 
-    private final String TPL = "<script> SELECT %s FROM %s %s %s </script>";
+    private final String TPL = "<script> SELECT %s FROM %s %s %s %s</script>";
 
     @Override
     protected void buildStatement() {
@@ -20,7 +20,8 @@ public class QueryList extends JpaMethodParser {
                 ParserHelper.getSelectItems(meta),
                 meta.getTable(),
                 EntityMeta.ALIAS,
-                ParserHelper.getJoinItems(meta));
+                ParserHelper.getJoinItems(meta),
+                ParserHelper.getOrderByItems(meta));
         SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, Object.class);
         addMappedStatement(
                 sqlSource,

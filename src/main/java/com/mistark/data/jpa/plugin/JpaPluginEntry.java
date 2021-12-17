@@ -46,6 +46,7 @@ public class JpaPluginEntry implements Interceptor {
                 plugin.patch(ms, boundSql);
             }
         }
+        System.out.println(boundSql.getSql());
         return invocation.proceed();
     }
 }

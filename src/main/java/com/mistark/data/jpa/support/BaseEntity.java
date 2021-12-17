@@ -45,6 +45,11 @@ public class BaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date updateDate;
 
+    @Version
+    @Column
+    @JsonString
+    private Integer version;
+
     @SoftDel
     @Column
     @JsonIgnore

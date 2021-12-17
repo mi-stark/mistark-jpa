@@ -1,6 +1,7 @@
 package com.mistark.data.jpa.plugin;
 
 import com.mistark.data.jpa.helper.EntityHelper;
+import com.mistark.data.jpa.helper.SoftDelHelper;
 import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
 import com.mistark.data.jpa.support.IdGenerator;
@@ -40,6 +41,7 @@ public class JpaInsertPlugin implements JpaPlugin {
         if(meta == null || (!meta.getEntity().equals(pi.getClass()) && !(pi instanceof Map))) return;
         MetaObject metaObject = SystemMetaObject.forObject(pi);
         Map<EntityField, Object> metaValue = new ConcurrentHashMap<>();
+
         if(meta.getId()!=null){
             Object id = metaObject.getValue(meta.getId().getName());
             if(id == null){
@@ -47,16 +49,6 @@ public class JpaInsertPlugin implements JpaPlugin {
                         ? idGenerator.nextId()
                         : idGenerator.nextUUID();
                 metaValue.put(meta.getId(), id);
-            }
-        }
-        
-        if(pluginConfig.getUserIdService()!=null){
-            Object userId = pluginConfig.getUserIdService().getUserId();
-            if(meta.getCreateBy()!=null){
-                metaValue.put(meta.getCreateBy(), userId);
-            }
-            if(meta.getUpdateBy()!=null){
-                metaValue.put(meta.getUpdateBy(), userId);
             }
         }
 
@@ -71,6 +63,20 @@ public class JpaInsertPlugin implements JpaPlugin {
         
         if(meta.getVersion()!=null){
             metaValue.put(meta.getVersion(), 0);
+        }
+
+        if(meta.isSoftDel()){
+            metaValue.put(meta.getSoftDel(), SoftDelHelper.getValue(false, meta));
+        }
+
+        if(pluginConfig.getUserIdService()!=null){
+            Object userId = pluginConfig.getUserIdService().getUserId();
+            if(meta.getCreateBy()!=null){
+                metaValue.put(meta.getCreateBy(), userId);
+            }
+            if(meta.getUpdateBy()!=null){
+                metaValue.put(meta.getUpdateBy(), userId);
+            }
         }
         
         if(pluginConfig.getTenantIdService()!=null){

@@ -1,5 +1,7 @@
 package com.mistark.data.jpa.meta;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.mistark.data.jpa.annotation.SortType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -32,12 +34,17 @@ public class Query {
     
     @Getter @Setter
     private Integer page = 1;
+
     @Getter @Setter
     private Integer pageSize = 10;
+
     @Getter @Setter
     private List<QueryFilter> filters = new ArrayList<>();
+
     @Getter @Setter
-    private List<QuerySort> sorts = new ArrayList<>();
+    private List<QuerySort> sorters = new ArrayList<>();
+
+    @JsonIgnore
     @Getter @Setter
     private QueryType queryType = QueryType.PAGE;
 
@@ -53,7 +60,7 @@ public class Query {
         this.page = query.getPage();
         this.pageSize = query.getPageSize();
         this.filters = query.getFilters();
-        this.sorts = query.getSorts();
+        this.sorters = query.getSorters();
         this.queryType = query.getQueryType();
         this.safeCheck = query.isSafeCheck();
     }
@@ -175,31 +182,31 @@ public class Query {
 
     public Query orderBy(String field){
         QuerySort querySort = new QuerySort();
-        querySort.setField(field);
-        sorts.add(querySort);
+        querySort.setOrderBy(field);
+        sorters.add(querySort);
         return this;
     }
 
-    public Query orderBy(String field, SortOrder sortOrder){
+    public Query orderBy(String field, SortType sortType){
         QuerySort querySort = new QuerySort();
-        querySort.setField(field);
-        querySort.setOrder(sortOrder);
-        sorts.add(querySort);
+        querySort.setOrderBy(field);
+        querySort.setSortType(sortType);
+        sorters.add(querySort);
         return this;
     }
 
     public Query asc(){
-        QuerySort querySort = sorts.get(sorts.size() - 1);
+        QuerySort querySort = sorters.get(sorters.size() - 1);
         if(querySort != null){
-            querySort.setOrder(SortOrder.ASC);
+            querySort.setSortType(SortType.ASC);
         }
         return this;
     }
 
     public Query desc(){
-        QuerySort querySort = sorts.get(sorts.size() - 1);
+        QuerySort querySort = sorters.get(sorters.size() - 1);
         if(querySort != null){
-            querySort.setOrder(SortOrder.DESC);
+            querySort.setSortType(SortType.DESC);
         }
         return this;
     }
@@ -219,7 +226,7 @@ public class Query {
         this.page = 1;
         this.pageSize = limit;
         if(limit == 1){
-            this.sorts = new ArrayList<>();
+            this.sorters = new ArrayList<>();
         }
         return this;
     }
@@ -245,16 +252,12 @@ public class Query {
     @Setter
     @Getter
     public static class QuerySort{
-        private String field;
-        private SortOrder order = SortOrder.ASC;
+        private String orderBy;
+        private SortType sortType = SortType.ASC;
     }
 
     public enum LogicOperator{
         AND,OR
-    }
-
-    public enum SortOrder {
-        ASC,DESC
     }
     
     public enum QueryType {

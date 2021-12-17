@@ -1,5 +1,6 @@
 package com.mistark.data.jpa.plugin;
 
+import com.mistark.data.jpa.annotation.SortType;
 import com.mistark.data.jpa.helper.*;
 import com.mistark.data.jpa.meta.EntityField;
 import com.mistark.data.jpa.meta.EntityMeta;
@@ -19,8 +20,6 @@ import net.sf.jsqlparser.expression.operators.relational.*;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.schema.Table;
 import net.sf.jsqlparser.statement.select.*;
-import org.apache.commons.beanutils.ConvertUtils;
-import org.apache.commons.beanutils.converters.DateConverter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.mapping.*;
 import org.springframework.stereotype.Component;
@@ -29,8 +28,8 @@ import org.springframework.util.CollectionUtils;
 import javax.annotation.Resource;
 import javax.sql.DataSource;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @Component
 @Order(PluginOrder.SELECT)
@@ -40,7 +39,7 @@ public class JpaSelectPlugin implements JpaPlugin {
     PluginConfig pluginConfig;
 
     private Map<Class, Object> getParams(BoundSql boundSql){
-        Map<Class, Object> objectMap = new ConcurrentHashMap<>();
+        Map<Class, Object> objectMap = new HashMap<>();
         Value<Consumer> callback = new Value<>();
         Set<Integer> set = new HashSet<>();
         callback.set(obj-> {
@@ -77,12 +76,12 @@ public class JpaSelectPlugin implements JpaPlugin {
         vars.boundSql = boundSql;
         vars.params = params;
         vars.query = query;
-        vars.markedSql = PluginHelper.getMarkedSql(boundSql);
-        vars.plainSelect = PluginHelper.getPlainSelect(vars.markedSql);
-        vars.plainSelect = PluginHelper.getPlainSelect(vars.markedSql);
-        vars.columnMap = PluginHelper.getColumns(vars.plainSelect);
-        vars.entityMeta = EntityHelper.fromStatement(ms);
-        vars.addon = new ConcurrentHashMap<>();
+        vars.sql = PluginHelper.getMarkedSql(boundSql);
+        vars.select = PluginHelper.getPlainSelect(vars.sql);
+        vars.select = PluginHelper.getPlainSelect(vars.sql);
+        vars.columns = PluginHelper.getColumns(vars.select);
+        vars.meta = EntityHelper.fromStatement(ms);
+        vars.addon = new HashMap<>();
         return vars;
     }
 
@@ -124,8 +123,8 @@ public class JpaSelectPlugin implements JpaPlugin {
         if(operatorType == null){
             throw new NotSupportedOperator(String.format("Unsupported operator %s", operator.get()));
         }
-        EntityField fieldInfo = vars.entityMeta.getFields().get(field.get());
-        Column column = vars.columnMap.get(field.get());
+        EntityField fieldInfo = vars.meta.getFields().get(field.get());
+        Column column = vars.columns.get(field.get());
         if(column == null){
             if(fieldInfo!=null){
                 column = new Column(fieldInfo.getColumn());
@@ -195,29 +194,20 @@ public class JpaSelectPlugin implements JpaPlugin {
             Object val = entry.getValue();
             Class toType = targetType.get();
             if(val!=null && toType != null && !toType.isAssignableFrom(val.getClass())){
-                if(toType.isAssignableFrom(Date.class)){
-                    String pattern =
-                            fieldInfo!=null && fieldInfo.getPattern()!=null
-                            ? fieldInfo.getPattern() : "yyyy-MM-dd HH:mm:ss";
-                    DateConverter dateConverter = new DateConverter();
-                    dateConverter.setPattern(pattern);
-                    val = dateConverter.convert(toType, val);
-                }else {
-                    val = ConvertUtils.convert(val, toType);
-                }
+                ConvertHelper.convert(val, toType, fieldInfo!=null ? fieldInfo.getPattern() : null);
             }
             vars.addon.put(entry.getKey(), val);
         });
         return target;
     }
 
-    private List<Table> getTables(PlainSelect plainSelect){
+    private List<Table> getTables(PlainSelect select){
         List<Table> tables = new ArrayList<>();
-        FromItem fromItem = plainSelect.getFromItem();
+        FromItem fromItem = select.getFromItem();
         if(fromItem instanceof Table){
             tables.add((Table) fromItem);
         }
-        List<Join> joins = plainSelect.getJoins();
+        List<Join> joins = select.getJoins();
         if(!CollectionUtils.isEmpty(joins)) joins.forEach(join -> {
             FromItem item = join.getRightItem();
             if(item instanceof Table){
@@ -231,15 +221,15 @@ public class JpaSelectPlugin implements JpaPlugin {
         Expression target = null;
         for (Table table: tables){
             String name = table.getName();
-            EntityMeta entityMeta = EntityHelper.resolve(name);
-            if(!SoftDelHelper.isSoftDel(entityMeta)) continue;
+            EntityMeta meta = EntityHelper.resolve(name);
+            if(!SoftDelHelper.isSoftDel(meta)) continue;
             Column column = new Column();
             column.setTable(table);
-            column.setColumnName(entityMeta.getSoftDel().getColumn());
+            column.setColumnName(meta.getSoftDel().getColumn());
             EqualsTo equalsTo = new EqualsTo();
             equalsTo.setLeftExpression(column);
             String key = PluginHelper.getParamName();
-            vars.addon.put(key, SoftDelHelper.getValue(false, entityMeta.getSoftDel().getJavaType()));
+            vars.addon.put(key, SoftDelHelper.getValue(false, meta));
             equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
             target = target == null ? equalsTo : new AndExpression(target, equalsTo);
         }
@@ -252,11 +242,11 @@ public class JpaSelectPlugin implements JpaPlugin {
         Expression target = null;
         for (Table table: tables){
             String name = table.getName();
-            EntityMeta entityMeta = EntityHelper.resolve(name);
-            if(entityMeta==null || entityMeta.getTenantId()==null) continue;
+            EntityMeta meta = EntityHelper.resolve(name);
+            if(meta==null || meta.getTenantId()==null) continue;
             Column column = new Column();
             column.setTable(table);
-            column.setColumnName(entityMeta.getTenantId().getColumn());
+            column.setColumnName(meta.getTenantId().getColumn());
             EqualsTo equalsTo = new EqualsTo();
             equalsTo.setLeftExpression(column);
             String key = PluginHelper.getParamName();
@@ -268,44 +258,64 @@ public class JpaSelectPlugin implements JpaPlugin {
     }
 
     void patchWhere(SelectVars vars) throws Throwable {
-        PlainSelect plainSelect = vars.plainSelect;
+        PlainSelect select = vars.select;
         List<Expression> whereItems = new ArrayList<>();
-        whereItems.add(plainSelect.getWhere());
+        whereItems.add(select.getWhere());
         Query query = vars.query;
         if(query!=null){
             whereItems.add(parseQueryFilters(query.getFilters(), vars, query.isSafeCheck()));
         }
-        List<Table> tables = getTables(vars.plainSelect);
+        List<Table> tables = getTables(vars.select);
         whereItems.add(parseSoftDel(tables, vars));
         whereItems.add(parseTenant(tables, vars));
-        Expression target = plainSelect.getWhere();
+        Expression target = select.getWhere();
         for (Expression exp : whereItems){
             if(exp==null) continue;
             exp = new Parenthesis(exp);
             target = target==null ? exp : new AndExpression(target, exp);
         }
-        plainSelect.setWhere(target);
+        select.setWhere(target);
     }
 
     private void patchTotal(SelectVars vars){
-        EntityMeta meta = vars.entityMeta;
-        PlainSelect plainSelect = vars.plainSelect;
-        plainSelect.setSelectItems(new ArrayList<SelectItem>(){{
+        EntityMeta meta = vars.meta;
+        PlainSelect select = vars.select;
+        select.setSelectItems(new ArrayList<SelectItem>(){{
             SelectExpressionItem selectItem = new SelectExpressionItem();
             selectItem.setExpression(new Column("COUNT(1)"));
             selectItem.setAlias(new Alias(meta.getId().getName()));
             add(selectItem);
         }});
-        plainSelect.setLimit(null);
-        plainSelect.setOrderByElements(null);
+        select.setLimit(null);
+        select.setOrderByElements(null);
     }
 
-    private void patchPage(SelectVars vars) throws Throwable {
+    private void patchOrderBy(SelectVars vars){
+        Query query = vars.query;
+        if(query==null || CollectionUtils.isEmpty(query.getSorters())) return;
+        Map<String, OrderByElement> sortMap = new HashMap<>();
+        List<OrderByElement> orderByElements = vars.select.getOrderByElements();
+        if(!CollectionUtils.isEmpty(orderByElements)) {
+            orderByElements.forEach(odby -> sortMap.put(odby.getExpression().toString(), odby));
+        }
+        query.getSorters().forEach(querySort -> {
+            Column column = vars.columns.get(querySort.getOrderBy());
+            if(column==null) return;
+            OrderByElement orderByElement = new OrderByElement();
+            orderByElement.setExpression(column);
+            orderByElement.setAsc(querySort.getSortType() == SortType.ASC);
+            sortMap.put(column.toString(), orderByElement);
+        });
+        orderByElements = sortMap.values().stream().collect(Collectors.toList());
+        vars.select.setOrderByElements(orderByElements);
+    }
+
+    private void patchLimit(SelectVars vars) throws Throwable {
         DataSource dataSource = vars.ms.getConfiguration().getEnvironment().getDataSource();
         PageDialect pageDialect = DialectHelper.getPageDialect(dataSource);
-        Value<PlainSelect> selectValue = new Value<>(vars.plainSelect);
+        Value<PlainSelect> selectValue = new Value<>(vars.select);
         pageDialect.patch(vars.query.getPage(), vars.query.getPageSize(), selectValue, vars.addon);
-        vars.plainSelect = selectValue.get();
+        vars.select = selectValue.get();
     }
 
     @Override
@@ -323,11 +333,14 @@ public class JpaSelectPlugin implements JpaPlugin {
             QueryType queryType = query.getQueryType();
             if(queryType == QueryType.TOTAL){
                 patchTotal(vars);
-            }else if(queryType == QueryType.PAGE){
-                patchPage(vars);
+            }else {
+                patchOrderBy(vars);
+                if(queryType == QueryType.PAGE){
+                    patchLimit(vars);
+                }
             }
         }
-        PluginHelper.updateBoundSql(vars.ms, vars.boundSql, vars.plainSelect.toString(), vars.addon);
+        PluginHelper.updateBoundSql(vars.ms, vars.boundSql, vars.select.toString(), vars.addon);
     }
 
     private class SelectVars {
@@ -335,10 +348,10 @@ public class JpaSelectPlugin implements JpaPlugin {
         private BoundSql boundSql;
         private Map<Class, Object> params;
         private Query query;
-        private String markedSql;
-        private PlainSelect plainSelect;
-        private Map<String, Column> columnMap;
-        private EntityMeta entityMeta;
+        private String sql;
+        private PlainSelect select;
+        private Map<String, Column> columns;
+        private EntityMeta meta;
         private Map<String, Object> addon;
     }
 

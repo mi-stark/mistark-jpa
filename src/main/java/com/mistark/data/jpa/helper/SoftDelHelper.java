@@ -35,11 +35,15 @@ public class SoftDelHelper {
     }
 
     public static boolean isSoftDel(EntityMeta meta){
-        return meta!=null && meta.getSoftDel()!=null;
+        return meta!=null && meta.isSoftDel();
     }
 
     public static boolean isSoftDel(MappedStatement ms){
         return ms!=null && softDelMs.contains(ms.hashCode());
+    }
+
+    public static Object getValue(boolean flag, EntityMeta meta){
+        return getValue(flag, meta.getSoftDel().getJavaType());
     }
 
     public static Object getValue(boolean flag, Class type){

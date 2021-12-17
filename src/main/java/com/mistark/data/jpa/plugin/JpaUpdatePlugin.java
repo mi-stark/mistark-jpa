@@ -26,7 +26,6 @@ public class JpaUpdatePlugin implements JpaPlugin {
     public void patch(MappedStatement ms, BoundSql boundSql){
         UpdateVars vars = getVars(ms, boundSql);
 
-
     }
 
     private class UpdateVars{

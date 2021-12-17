@@ -17,7 +17,7 @@ public abstract class JpaMethodParser {
     protected MapperBuilderAssistant assistant;
     protected Class type;
     protected Method method;
-    protected EntityMeta entityMeta;
+    protected EntityMeta meta;
 
     public final void parse(Configuration configuration, MapperBuilderAssistant assistant, Class type, Method method){
         this.configuration = configuration;
@@ -25,7 +25,7 @@ public abstract class JpaMethodParser {
         this.assistant = assistant;
         this.type = type;
         this.method = method;
-        this.entityMeta = EntityHelper.fromMethod(type, method);
+        this.meta = EntityHelper.fromMethod(type, method);
         buildStatement();
     }
 

@@ -5,10 +5,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.TYPE)
+@Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Table {
+public @interface OrderBy {
     String name() default "";
-    Join[] joins() default {};
-    OrderBy[] orderBys() default {};
+    SortType sortType() default SortType.ASC;
 }

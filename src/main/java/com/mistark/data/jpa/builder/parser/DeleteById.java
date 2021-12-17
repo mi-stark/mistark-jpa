@@ -16,30 +16,30 @@ public class DeleteById extends JpaMethodParser {
     @Override
     protected void buildStatement() {
         String script;
-        boolean isSoft = SoftDelHelper.isSoftDel(entityMeta);
+        boolean isSoft = SoftDelHelper.isSoftDel(meta);
         if(isSoft){
             script = String.format(
                     SOFT_DEL_TPL,
-                    entityMeta.getTable(),
-                    entityMeta.getSoftDel().getColumn(),
-                    SoftDelHelper.getValue(true, entityMeta.getSoftDel().getJavaType()),
-                    entityMeta.getId().getColumn(),
-                    entityMeta.getId().getName(),
-                    entityMeta.getSoftDel().getColumn(),
-                    SoftDelHelper.getValue(false, entityMeta.getSoftDel().getJavaType()));
+                    meta.getTable(),
+                    meta.getSoftDel().getColumn(),
+                    SoftDelHelper.getValue(true, meta.getSoftDel().getJavaType()),
+                    meta.getId().getColumn(),
+                    meta.getId().getName(),
+                    meta.getSoftDel().getColumn(),
+                    SoftDelHelper.getValue(false, meta.getSoftDel().getJavaType()));
         }else {
             script = String.format(
                     TPL,
-                    entityMeta.getTable(),
-                    entityMeta.getId().getColumn(),
-                    entityMeta.getId().getName());
+                    meta.getTable(),
+                    meta.getId().getColumn(),
+                    meta.getId().getName());
         }
         SqlCommandType sqlCommandType = isSoft ? SqlCommandType.UPDATE : SqlCommandType.DELETE;
-        SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, entityMeta.getEntity());
+        SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, meta.getEntity());
         MappedStatement ms = addMappedStatement(
                 sqlSource,
                 sqlCommandType,
-                entityMeta.getEntity(),
+                meta.getEntity(),
                 null,
                 Integer.class,
                 NoKeyGenerator.INSTANCE,

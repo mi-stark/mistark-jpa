@@ -5,7 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 
-public abstract class BaseService<T extends BaseEntity> {
+public class BaseService<T extends BaseEntity> {
 
     @Autowired
     private BaseMapper<T> baseMapper;
@@ -34,11 +34,9 @@ public abstract class BaseService<T extends BaseEntity> {
     }
 
     public int save(T entity){
-        if(entity.getId()!=null && queryById(entity)!=null){
-            return updateById(entity);
-        }else {
-            return insert(entity);
-        }
+        return entity.getId()!=null && queryById(entity)!=null
+                ? updateById(entity)
+                : insert(entity);
     }
 
     public int updateById(T entity){

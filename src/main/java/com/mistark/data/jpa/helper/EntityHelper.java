@@ -83,11 +83,9 @@ public class EntityHelper {
                 Column column = AnnotationUtils.getAnnotation(field, Column.class);
                 if(column == null) return;
                 EntityField entityField = new EntityField();
-                Value<Boolean> skip = new Value<>(false);
                 Arrays.stream(annoTypes).anyMatch(t -> {
                     Annotation anno = AnnotationUtils.getAnnotation(field, t);
                     if(anno!=null) {
-                        skip.set(anno instanceof SoftDel);
                         annoFieldMap.put(t, entityField);
                         return true;
                     }
@@ -108,15 +106,14 @@ public class EntityHelper {
                 entityField.setJavaType(field.getType());
                 entityField.setTable(columnTable);
                 entityField.setPattern(pattern);
-                if(skip.get()) return;
                 fieldMap.put(entityField.getName(), entityField);
             });
             MetaObject metaObject = SystemMetaObject.forObject(meta);
             Arrays.stream(annoTypes).forEach(t -> metaObject.setValue(StringUtils.uncapitalize(t.getSimpleName()), annoFieldMap.get(t)));
-            if(meta.getId() == null) meta.setId(fieldMap.get("id"));
             if(meta.getId()!=null && meta.getId()==meta.getSoftDel()){
                 throw new BuilderException("primary key id and soft delete flag cannot be the same field");
             }
+            if(meta.getId()==null) meta.setId(meta.resolve(EntityMeta.ID_KEY_DEFAULT));
             return meta;
         });
     }

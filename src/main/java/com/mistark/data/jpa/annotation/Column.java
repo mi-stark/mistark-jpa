@@ -9,5 +9,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Column {
     String name() default "";
-    String table() default "";
+    String tableAlias() default "";
 }

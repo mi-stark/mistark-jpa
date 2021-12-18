@@ -4,6 +4,7 @@ import com.mistark.data.jpa.annotation.BindParser;
 import com.mistark.data.jpa.annotation.SoftDel;
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.helper.SoftDelHelper;
+import com.mistark.data.jpa.meta.EntityMeta;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -37,9 +38,8 @@ public class JpaMapperBuilder {
             String id = getId(type, method);
             if(hasStatement(id)){
                 MappedStatement ms = configuration.getMappedStatement(id);
-                EntityHelper.fromStatement(ms);
-                SoftDel softDel = AnnotationUtils.getAnnotation(method, SoftDel.class);
-                if(softDel!=null){
+                EntityMeta meta = EntityHelper.fromMethod(type, method);
+                if(meta.isSoftDel()) {
                     SoftDelHelper.addSoftDelStatement(ms);
                 }
                 continue;

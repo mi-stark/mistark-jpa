@@ -1,34 +1,35 @@
-package com.mistark.data.jpa.builder.parser;
+package com.mistark.data.jpa.parser;
 
 import com.mistark.data.jpa.builder.JpaMethodParser;
-import com.mistark.data.jpa.builder.ParserHelper;
+import com.mistark.data.jpa.helper.ParserHelper;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
 import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.mapping.SqlSource;
 import org.springframework.stereotype.Component;
 
 @Component
-public class Insert extends JpaMethodParser {
+public class UpdateById extends JpaMethodParser {
 
-    private String TPL = "<script> INSERT INTO %s (%s) VALUES (%s) </script>";
+    private String TPL = "<script> UPDATE %s <set>%s</set> WHERE %s = #{%s} </script>";
 
     @Override
     protected void buildStatement() {
         String script = String.format(
                 TPL,
                 meta.getTable(),
-                ParserHelper.getInsertItems(meta),
-                ParserHelper.getInsertValues(meta));
+                ParserHelper.getUpdateItems(meta),
+                meta.getId().getColumn(),
+                meta.getId().getName());
         SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, meta.getEntity());
         addMappedStatement(
                 sqlSource,
-                SqlCommandType.INSERT,
+                SqlCommandType.UPDATE,
                 meta.getEntity(),
                 null,
                 Integer.class,
-                new NoKeyGenerator(),
-                meta.getId().getName(),
-                meta.getId().getColumn()
+                NoKeyGenerator.INSTANCE,
+                null,
+                null
         );
     }
 }

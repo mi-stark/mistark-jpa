@@ -1,7 +1,8 @@
 package com.mistark.data.jpa.helper;
 
+import com.mistark.data.jpa.annotation.SoftDel;
 import com.mistark.data.jpa.meta.EntityMeta;
-import com.mistark.data.jpa.meta.EntityMeta.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.MappedStatement;
 
@@ -32,7 +33,7 @@ public class SoftDelHelper {
 
     public static void addSoftDelStatement(MappedStatement ms){
         if(ms == null) return;
-        softDelMs.add(ms.hashCode());
+        softDelMs.add(ms.getId().hashCode());
     }
 
     public static boolean isSoftDel(EntityMeta meta){
@@ -40,7 +41,14 @@ public class SoftDelHelper {
     }
 
     public static boolean isSoftDel(MappedStatement ms){
-        return ms!=null && softDelMs.contains(ms.hashCode());
+        return ms!=null && softDelMs.contains(ms.getId().hashCode());
+    }
+
+    public static boolean isSoftDelOff(EntityMeta meta){
+        if(!meta.isSoftDel() && EntityHelper.resolve(meta.getEntity()).isSoftDel()){
+            return true;
+        }
+        return false;
     }
 
     public static Object getValue(boolean flag, EntityMeta meta){
@@ -48,10 +56,24 @@ public class SoftDelHelper {
     }
 
     public static Object getValue(boolean flag, Class type){
-        Object value = (flag ? ValidVals: InValidVals).get(type);
-        if(value == null){
-            throw new BuilderException(String.format("wrong type as a delete flag \"%s\"", type.getName()));
+        return  (flag ? ValidVals: InValidVals).get(type);
+    }
+
+    public static void checkSoftDel(SoftDel annoSoftDel, EntityMeta meta){
+        if(annoSoftDel!=null){
+            if(annoSoftDel.enable()){
+                EntityMeta.EntityField softDel = meta.resolve(annoSoftDel.field());
+                if(softDel == null){
+                    throw new BuilderException(String.format("No column found with field name \"%s\" for soft delete", annoSoftDel.field()));
+                }else {
+                    meta.setSoftDel(softDel);
+                }
+            }else {
+                meta.setSoftDel(null);
+            }
         }
-        return value;
+        if(meta.isSoftDel() && !ValidVals.containsKey(meta.getSoftDel().getJavaType())){
+            throw new BuilderException("Wrong type for soft delete ：" + meta.getSoftDel().getJavaType().getName());
+        }
     }
 }

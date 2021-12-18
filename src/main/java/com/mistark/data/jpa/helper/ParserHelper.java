@@ -1,10 +1,12 @@
-package com.mistark.data.jpa.builder;
+package com.mistark.data.jpa.helper;
 
 import com.mistark.data.jpa.annotation.SortType;
-import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
 import com.mistark.data.jpa.meta.EntityMeta.*;
+import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
 import net.sf.jsqlparser.schema.Column;
+import net.sf.jsqlparser.statement.select.GroupByElement;
 import net.sf.jsqlparser.statement.select.OrderByElement;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import org.springframework.util.CollectionUtils;
@@ -19,7 +21,7 @@ public class ParserHelper {
         return meta.fields()
                 .stream()
                 .map(f-> String.format("%s.%s AS %s",
-                        f.getTable(),
+                        f.getTableAlias(),
                         f.getColumn(),
                         f.getName()))
                 .collect(Collectors.joining(","));
@@ -29,16 +31,12 @@ public class ParserHelper {
         if(CollectionUtils.isEmpty(meta.getJoins())) return "";
         return meta.getJoins()
                 .stream()
-                .map(j -> {
-                    EntityMeta m = EntityHelper.resolve(j.getEntity());
-                    return String.format(
-                            "%s JOIN %s %s ON %s = %s",
+                .map(j -> String.format(
+                            "%s JOIN %s %s ON ",
                             j.getJoinType(),
-                            m.getTable(),
+                            j.getTable(),
                             j.getAlias(),
-                            j.getOnLeft(),
-                            j.getOnRight());
-                })
+                            j.getOn()))
                 .collect(Collectors.joining(" "));
     }
 
@@ -48,7 +46,7 @@ public class ParserHelper {
                 .stream()
                 .map(j -> {
                     EntityField field = meta.resolve(j.getField());
-                    Column column = new Column(String.format("%s.%s", field.getTable(), field.getColumn()));
+                    Column column = new Column(field.getTableAlias()+ "."+ field.getColumn());
                     OrderByElement orderByElement = new OrderByElement();
                     orderByElement.setExpression(column);
                     orderByElement.setAsc(j.getSortType() == SortType.ASC);
@@ -58,8 +56,23 @@ public class ParserHelper {
         return PlainSelect.orderByToString(orderByElements).trim();
     }
 
+    public static String getGroupByItems(EntityMeta meta){
+        if(CollectionUtils.isEmpty(meta.getGroupBys())) return "";
+        List<Expression> orderBys = new ArrayList<>();
+        meta.getGroupBys().stream().forEach(fl -> {
+            EntityField field = meta.resolve(fl);
+            Column column = new Column(field.getTableAlias() + "." + field.getColumn());
+            orderBys.add(column);
+        });
+        ExpressionList expressionList = new ExpressionList();
+        expressionList.setExpressions(orderBys);
+        GroupByElement groupByElement = new GroupByElement();
+        groupByElement.setGroupByExpressionList(expressionList);
+        return groupByElement.toString();
+    }
+
     public static boolean isInsertExclude(EntityField f, EntityMeta meta){
-        return !f.getTable().equals(EntityMeta.ALIAS)
+        return !f.getTableAlias().equals(meta.getTableAlias())
                 || f==meta.getSoftDel();
     }
 
@@ -88,7 +101,7 @@ public class ParserHelper {
     }
 
     public static boolean isUpdateExclude(EntityField f, EntityMeta meta){
-        return f.getTable().equals(EntityMeta.ALIAS)
+        return !f.getTableAlias().equals(meta.getTableAlias())
                 || f == meta.getId()
                 || f == meta.getSoftDel();
     }
@@ -103,7 +116,7 @@ public class ParserHelper {
                     f.getColumn(),
                     f.getName()));
         });
-        return items.stream().collect(Collectors.joining(","));
+        return items.stream().collect(Collectors.joining(" "));
     }
 
 }

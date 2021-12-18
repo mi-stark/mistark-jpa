@@ -9,7 +9,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.MappedStatement;
-import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -26,17 +25,10 @@ public class EntityHelper {
 
     private final static Map<Integer, EntityMeta> KnownMetas = new ConcurrentHashMap<>();
     private final static Map<Integer, EntityMeta> KnownTableNameMetas = new ConcurrentHashMap<>();
-    private final static Map<Integer, EntityMeta> KnownMapperMetas = new ConcurrentHashMap<>();
-    private final static Map<Integer, EntityMeta> KnownMapperNameMetas = new ConcurrentHashMap<>();
-    private final static Map<Integer, EntityMeta> KnownMethodMetas = new ConcurrentHashMap<>();
     private final static Map<Integer, EntityMeta> KnownMethodNameMetas = new ConcurrentHashMap<>();
 
     public static boolean isEntity(Class entity){
         return entity!=null && AnnotationUtils.getAnnotation(entity, Entity.class)!=null;
-    }
-
-    public static boolean isEntity(Object obj){
-        return obj!=null && isEntity(obj.getClass());
     }
 
     public static EntityMeta resolve(Class entity){
@@ -45,38 +37,54 @@ public class EntityHelper {
             EntityMeta meta = new EntityMeta();
             meta.setEntity(entity);
             Map<String, TableOrderBy> orderByMap = new HashMap<>();
-            Table table = AnnotationUtils.getAnnotation(entity, Table.class);
-            if(table!=null){
-                if(table.joins().length > 0){
-                    List<TableJoin> joins = Arrays.stream(table.joins()).map(join -> {
+            Set<String> groupBys = new HashSet<>();
+            Table annoTable = AnnotationUtils.getAnnotation(entity, Table.class);
+            String table = null;
+            String tableAlias = null;
+            if(annoTable!=null){
+                table = annoTable.name().trim();
+                tableAlias = annoTable.alias().trim();
+                if(annoTable.joins().length > 0){
+                    List<TableJoin> joins = Arrays.stream(annoTable.joins()).map(join -> {
                         TableJoin tableJoin = new TableJoin();
-                        tableJoin.setEntity(join.entity());
-                        tableJoin.setAlias(join.alias());
-                        tableJoin.setOnLeft(join.onLeft());
-                        tableJoin.setOnRight(join.onRight());
+                        tableJoin.setTable(join.table().trim());
+                        tableJoin.setAlias(join.alias().trim());
+                        tableJoin.setOn(join.on().trim());
                         tableJoin.setJoinType(join.joinType());
+                        String scahma = "[A-Za-z]\\w{0,3}\\.[A-Za-z]\\w{0,29}";
+                        String pattern = String.format("^%s *= *%s$", scahma, scahma);
+                        Matcher matcher = Pattern.compile(pattern).matcher(tableJoin.getOn());
+                        if(!matcher.matches()){
+                            throw new BuilderException("Invalid value at @Join.on：" + tableJoin.getOn());
+                        }
                         return tableJoin;
                     }).collect(Collectors.toList());
                     meta.setJoins(joins);
                 }
-                if(table.orderBys().length > 0){
-                    Arrays.stream(table.orderBys()).forEach(orderBy -> {
+                if(annoTable.groupBys().length > 0){
+                    Arrays.stream(annoTable.groupBys()).forEach(field -> {
+                        if(StringUtils.isEmpty(field.trim())) return;
+                        groupBys.add(field.trim());
+                    });
+                }
+                if(annoTable.groupBys().length > 0){
+                    Arrays.stream(annoTable.orderBys()).forEach(orderBy -> {
                         TableOrderBy tableOrderBy = new TableOrderBy();
-                        tableOrderBy.setField(orderBy.name());
+                        tableOrderBy.setField(orderBy.name().trim());
                         tableOrderBy.setSortType(orderBy.sortType());
                         orderByMap.put(tableOrderBy.getField(), tableOrderBy);
                     });
                 }
             }
-            String tableName = table!=null ? table.name().trim() : null;
-            if(StringUtils.isEmpty(tableName)){
-                tableName = StringHelper.toUnderline(entity.getSimpleName()).toLowerCase();
-            }
-            KnownTableNameMetas.put(tableName.hashCode(), meta);
-            meta.setTable(tableName);
-            Map<String, EntityField> fieldMap = new ConcurrentHashMap<>();
+            table = StringUtils.isEmpty(table)
+                    ? StringHelper.toUnderline(entity.getSimpleName()).toLowerCase()
+                    : table;
+            tableAlias = StringUtils.isEmpty(tableAlias) ? Table.ALIAS_DEFAULT : tableAlias;
+            meta.setTable(table);
+            meta.setTableAlias(tableAlias);
+            Map<String, EntityField> fieldMap = new HashMap<>();
             meta.setFields(fieldMap);
-            Map<Class, EntityField> annoFieldMap = new ConcurrentHashMap<>();
+            Map<Class, EntityField> annoFieldMap = new HashMap<>();
             Class[] annoTypes = new Class[]{
                     Id.class,
                     TenantId.class,
@@ -87,51 +95,82 @@ public class EntityHelper {
                     SoftDel.class,
                     Version.class
             };
-            FieldUtils.getAllFieldsList(entity).forEach(field -> {
-                Column column = AnnotationUtils.getAnnotation(field, Column.class);
-                if(column == null) return;
-                EntityField entityField = new EntityField();
-                Arrays.stream(annoTypes).anyMatch(t -> {
-                    Annotation anno = AnnotationUtils.getAnnotation(field, t);
+            FieldUtils.getAllFieldsList(entity).forEach(fl -> {
+                Column annoColumn = AnnotationUtils.getAnnotation(fl, Column.class);
+                if(annoColumn == null) return;
+                EntityField field = new EntityField();
+                Arrays.stream(annoTypes).anyMatch(type -> {
+                    Annotation anno = AnnotationUtils.getAnnotation(fl, type);
                     if(anno!=null) {
-                        annoFieldMap.put(t, entityField);
+                        if(type.equals(SoftDel.class) && !((SoftDel)anno).enable()){
+                            return false;
+                        }
+                        annoFieldMap.put(type, field);
                         return true;
                     }
                     return false;
                 });
-                String columnName = column.name().trim();
-                if(StringUtils.isEmpty(columnName)){
-                    columnName = StringHelper.toUnderline(field.getName()).toLowerCase();
-                }
-                String columnTable = column.table().trim();
-                if(StringUtils.isEmpty(columnTable)){
-                    columnTable = EntityMeta.ALIAS;
-                }
-                JsonFormat jsonFormat = AnnotationUtils.getAnnotation(field, JsonFormat.class);
-                String pattern = jsonFormat==null ? null : jsonFormat.pattern();
-                OrderBy orderBy = AnnotationUtils.getAnnotation(field, OrderBy.class);
-                if(orderBy!=null && !orderByMap.containsKey(field.getName())){
+                OrderBy orderBy = AnnotationUtils.getAnnotation(fl, OrderBy.class);
+                if(orderBy!=null && !orderByMap.containsKey(fl.getName())){
                     TableOrderBy tableOrderBy = new TableOrderBy();
                     tableOrderBy.setSortType(orderBy.sortType());
-                    tableOrderBy.setField(field.getName());
+                    tableOrderBy.setField(fl.getName());
                     orderByMap.put(tableOrderBy.getField(), tableOrderBy);
                 }
-                entityField.setName(field.getName());
-                entityField.setColumn(columnName);
-                entityField.setJavaType(field.getType());
-                entityField.setTable(columnTable);
-                entityField.setPattern(pattern);
-                fieldMap.put(entityField.getName(), entityField);
+                GroupBy groupBy = AnnotationUtils.getAnnotation(fl, GroupBy.class);
+                if(groupBy!=null && !groupBys.contains(fl.getName())){
+                    groupBys.add(fl.getName());
+                }
+                JsonFormat jsonFormat = AnnotationUtils.getAnnotation(fl, JsonFormat.class);
+                String pattern = jsonFormat==null ? null : jsonFormat.pattern();
+                String column = annoColumn.name().trim();
+                column = !StringUtils.isEmpty(column) ? column : StringHelper.toUnderline(fl.getName()).toLowerCase();
+                String columnTableAlias = annoColumn.tableAlias().trim();
+                columnTableAlias = StringUtils.isEmpty(columnTableAlias) ? meta.getTableAlias() : columnTableAlias;
+
+                field.setName(fl.getName());
+                field.setColumn(column);
+                field.setTableAlias(columnTableAlias);
+                field.setJavaType(fl.getType());
+                field.setPattern(pattern);
+                fieldMap.put(field.getName(), field);
             });
             MetaObject metaObject = SystemMetaObject.forObject(meta);
-            Arrays.stream(annoTypes).forEach(t -> metaObject.setValue(StringUtils.uncapitalize(t.getSimpleName()), annoFieldMap.get(t)));
-            if(meta.getId()!=null && meta.getId()==meta.getSoftDel()){
-                throw new BuilderException("primary key id and soft delete flag cannot be the same field");
-            }
-            if(meta.getId()==null) meta.setId(meta.resolve(EntityMeta.ID_KEY_DEFAULT));
+            Arrays.stream(annoTypes).forEach(anno -> {
+                String key = StringUtils.uncapitalize(anno.getSimpleName());
+                metaObject.setValue(key, annoFieldMap.get(anno));
+            });
             if(orderByMap.size()>0){
                 meta.setOrderBys(orderByMap.values().stream().collect(Collectors.toList()));
             }
+
+            if(groupBys.size()>0){
+                meta.setGroupBys(groupBys.stream().collect(Collectors.toList()));
+            }
+
+            if(meta.getId()==null) {
+                meta.setId(meta.resolve(Table.ID_DEFAULT));
+            }
+            if(meta.getId()!=null){
+                if(meta.getId()==meta.getSoftDel()){
+                    throw new BuilderException("ID primary key cannot be used as soft delete");
+                }
+                if(!Number.class.isAssignableFrom(meta.getId().getJavaType())
+                        || String.class.isAssignableFrom(meta.getId().getJavaType())){
+                    throw new BuilderException("Wrong type for ID primary key："+meta.getId().getJavaType().getName());
+                }
+            }else {
+                throw new BuilderException("ID primary key is required");
+            }
+
+            SoftDel annoSoftDel = AnnotationUtils.getAnnotation(entity, SoftDel.class);
+            SoftDelHelper.checkSoftDel(annoSoftDel, meta);
+
+            if(meta.getVersion()!=null && !Number.class.isAssignableFrom(meta.getVersion().getJavaType())){
+                throw new BuilderException("Wrong type for version：" + meta.getVersion().getJavaType().getName());
+            }
+
+            KnownTableNameMetas.put(meta.getTable().hashCode(), meta);
             return meta;
         });
     }
@@ -141,80 +180,60 @@ public class EntityHelper {
     }
 
     public static EntityMeta fromMapper(Class mapper){
-        return KnownMapperMetas.computeIfAbsent(mapper.hashCode(), k-> {
-            BindEntity bindEntity = AnnotationUtils.getAnnotation(mapper, BindEntity.class);
-            Value<Class> entity = new Value<>();
-            if(bindEntity!=null) entity.set(bindEntity.value());
-            else {
-                Arrays.stream(mapper.getGenericInterfaces()).anyMatch(t -> {
-                    if(t instanceof ParameterizedType){
-                        Type[] types = ((ParameterizedType)t).getActualTypeArguments();
-                        if(types.length > 0 && !(types[0] instanceof TypeVariable || types[0] instanceof WildcardType)) {
-                            entity.set((Class) types[0]);
-                        }
-                        return true;
+        BindEntity bindEntity = AnnotationUtils.getAnnotation(mapper, BindEntity.class);
+        Value<Class> entity = new Value<>();
+        if(bindEntity!=null) entity.set(bindEntity.value());
+        else {
+            Arrays.stream(mapper.getGenericInterfaces()).anyMatch(t -> {
+                if(t instanceof ParameterizedType){
+                    Type[] types = ((ParameterizedType)t).getActualTypeArguments();
+                    if(types.length > 0 && !(types[0] instanceof TypeVariable || types[0] instanceof WildcardType)) {
+                        entity.set((Class) types[0]);
                     }
-                    return false;
-                });
-            }
-            return resolve(entity.get());
-        });
-    }
-
-    public static EntityMeta fromMapper(String name){
-        return KnownMapperNameMetas.computeIfAbsent(name.hashCode(), k -> {
-            try {
-                Class mapper = Class.forName(name);
-                return fromMapper(mapper);
-            }catch (Throwable e){
-                return null;
-            }
-        });
+                    return true;
+                }
+                return false;
+            });
+        }
+        return resolve(entity.get());
     }
 
     public static EntityMeta fromMethod(Class type, Method method){
-        return KnownMethodMetas.computeIfAbsent(method.hashCode(), k -> {
-            BindEntity bindEntity = AnnotationUtils.getAnnotation(method, BindEntity.class);
-            return bindEntity != null ? EntityHelper.resolve(bindEntity.value()) : EntityHelper.fromMapper(type);
-        });
+        BindEntity bindEntity = AnnotationUtils.getAnnotation(method, BindEntity.class);
+        EntityMeta meta = bindEntity != null ? EntityHelper.resolve(bindEntity.value()) : EntityHelper.fromMapper(type);
+        SoftDel annoSoftDel = AnnotationUtils.getAnnotation(method, SoftDel.class);
+        if(meta!=null && annoSoftDel!=null) {
+            meta = meta.clone();
+            SoftDelHelper.checkSoftDel(annoSoftDel, meta);
+        }
+        String key = type.getName() + "." + method.getName();
+        KnownMethodNameMetas.put(key.hashCode(), meta);
+        return meta;
     }
 
     public static EntityMeta fromMethod(String name){
-        return KnownMethodNameMetas.computeIfAbsent(name.hashCode(), k->{
-            Pattern pattern = Pattern.compile("^(.+)\\.(.+)$");
-            Matcher matcher = pattern.matcher(name);
-            if(!matcher.matches()) return null;
-            try {
-                Class type = Class.forName(matcher.group(1));
-                Value<Method> method = new Value<>();
-                Arrays.stream(type.getMethods()).anyMatch(m -> {
-                    boolean match = !m.isDefault() && m.getName().equals(matcher.group(2));
-                    method.set(match ? m : null);
-                    return match;
-                });
-                return method.get()!=null ? fromMethod(type, method.get()) : null;
-            } catch (ClassNotFoundException e) {
-                return null;
-            }
-        });
+        return KnownMethodNameMetas.get(name.hashCode());
     }
 
     public static EntityMeta fromStatement(MappedStatement ms){
-        SqlCommandType sqlCommandType = ms.getSqlCommandType();
-        Class entity = null;
-        switch (sqlCommandType){
-            case SELECT:
-                if(ms.getResultMaps().size() > 0){
-                    entity = ms.getResultMaps().get(0).getType();
-                }
-                break;
-            case INSERT:
-            case UPDATE:
-            case DELETE:
-                entity = ms.getParameterMap().getType();
-                break;
-            default: break;
+        EntityMeta meta = fromMethod(ms.getId());
+        if(meta == null){
+            Class entity = null;
+            switch (ms.getSqlCommandType()){
+                case SELECT:
+                    if(ms.getResultMaps().size() > 0){
+                        entity = ms.getResultMaps().get(0).getType();
+                    }
+                    break;
+                case INSERT:
+                case UPDATE:
+                case DELETE:
+                    entity = ms.getParameterMap().getType();
+                    break;
+                default: break;
+            }
+            meta = isEntity(entity) ? resolve(entity) : null;
         }
-        return isEntity(entity) ? resolve(entity) : fromMethod(ms.getId());
+        return meta;
     }
 }

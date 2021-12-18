@@ -32,7 +32,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Component
-@Order(PluginOrder.SELECT)
+@Order(PluginOrders.SELECT)
 public class JpaSelectPlugin implements JpaPlugin {
 
     @Resource
@@ -76,16 +76,14 @@ public class JpaSelectPlugin implements JpaPlugin {
         vars.boundSql = boundSql;
         vars.params = params;
         vars.query = query;
-        vars.sql = PluginHelper.getMarkedSql(boundSql);
-        vars.select = PluginHelper.getPlainSelect(vars.sql);
-        vars.select = PluginHelper.getPlainSelect(vars.sql);
+        vars.select = PluginHelper.getPlainSelect(PluginHelper.getMarkedSql(boundSql));
         vars.columns = PluginHelper.getColumns(vars.select);
         vars.meta = EntityHelper.fromStatement(ms);
         vars.addon = new HashMap<>();
         return vars;
     }
 
-    private Expression parseQueryFilters(List<QueryFilter> filters,SelectVars vars, boolean isSafeCheck) throws Throwable{
+    private Expression parseQueryFilters(List<QueryFilter> filters,SelectVars vars) throws Throwable{
         if(CollectionUtils.isEmpty(filters)) return null;
         Expression target = null;
         LogicOperator logicOperator = LogicOperator.AND;
@@ -93,10 +91,10 @@ public class JpaSelectPlugin implements JpaPlugin {
             if(filter==null) continue;
             Expression patch;
             if(!CollectionUtils.isEmpty(filter.getGroup())){
-                patch = parseQueryFilters(filter.getGroup(), vars, isSafeCheck);
+                patch = parseQueryFilters(filter.getGroup(), vars);
                 patch = (patch == null) ? patch : new Parenthesis(patch);
             }else {
-                patch = parseFilter(filter, vars, isSafeCheck);
+                patch = parseFilter(filter, vars);
             }
             if(patch == null) continue;
             target = target == null
@@ -112,7 +110,7 @@ public class JpaSelectPlugin implements JpaPlugin {
         return target;
     }
     
-    private Expression parseFilter(QueryFilter filter, SelectVars vars, boolean isSafeCheck) throws Throwable {
+    private Expression parseFilter(QueryFilter filter, SelectVars vars) throws Throwable {
         Value<String> field = new Value<>(filter.getField());
         if(field.get()!=null) field.set(field.get().trim());
         if(StringUtils.isEmpty(field.get())) return null;
@@ -125,14 +123,6 @@ public class JpaSelectPlugin implements JpaPlugin {
         }
         EntityField fieldInfo = vars.meta.getFields().get(field.get());
         Column column = vars.columns.get(field.get());
-        if(column == null){
-            if(fieldInfo!=null){
-                column = new Column(fieldInfo.getColumn());
-            }else if(!isSafeCheck){
-                column = new Column(StringHelper.toUnderline(field.get()));
-            }
-            if(column == null) return null;
-        }
         Expression target = operatorType.newInstance();
         Value<Class> targetType = new Value<>(String.class);
         if(fieldInfo!=null) targetType.set(fieldInfo.getJavaType());
@@ -218,6 +208,7 @@ public class JpaSelectPlugin implements JpaPlugin {
     }
 
     private Expression parseSoftDel(List<Table> tables, SelectVars vars){
+        if(SoftDelHelper.isSoftDelOff(vars.meta)) return null;
         Expression target = null;
         for (Table table: tables){
             String name = table.getName();
@@ -263,18 +254,12 @@ public class JpaSelectPlugin implements JpaPlugin {
         whereItems.add(select.getWhere());
         Query query = vars.query;
         if(query!=null){
-            whereItems.add(parseQueryFilters(query.getFilters(), vars, query.isSafeCheck()));
+            whereItems.add(parseQueryFilters(query.getFilters(), vars));
         }
         List<Table> tables = getTables(vars.select);
         whereItems.add(parseSoftDel(tables, vars));
         whereItems.add(parseTenant(tables, vars));
-        Expression target = select.getWhere();
-        for (Expression exp : whereItems){
-            if(exp==null) continue;
-            exp = new Parenthesis(exp);
-            target = target==null ? exp : new AndExpression(target, exp);
-        }
-        select.setWhere(target);
+        select.setWhere(PluginHelper.mergeWhereItems(whereItems));
     }
 
     private void patchTotal(SelectVars vars){
@@ -348,7 +333,6 @@ public class JpaSelectPlugin implements JpaPlugin {
         private BoundSql boundSql;
         private Map<Class, Object> params;
         private Query query;
-        private String sql;
         private PlainSelect select;
         private Map<String, Column> columns;
         private EntityMeta meta;

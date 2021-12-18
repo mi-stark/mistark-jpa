@@ -6,7 +6,7 @@ import org.apache.ibatis.mapping.SqlCommandType;
 import org.springframework.stereotype.Component;
 
 @Component
-@Order(PluginOrder.DELETE)
+@Order(PluginOrders.DELETE)
 public class JpaDeletePlugin implements JpaPlugin {
 
     @Override

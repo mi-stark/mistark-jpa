@@ -28,9 +28,6 @@ public class Query {
     public final static String NOT_NULL = "!0";
     public final static String IN = "()";
     public final static String NOT_IN = "!()";
-
-    @Getter
-    private boolean safeCheck;
     
     @Getter @Setter
     private Integer page = 1;
@@ -49,11 +46,6 @@ public class Query {
     private QueryType queryType = QueryType.PAGE;
 
     public Query() {
-        this.safeCheck = true;
-    }
-
-    public Query(boolean safeCheck) {
-        this.safeCheck = safeCheck;
     }
 
     public Query(Query query){
@@ -62,7 +54,6 @@ public class Query {
         this.filters = query.getFilters();
         this.sorters = query.getSorters();
         this.queryType = query.getQueryType();
-        this.safeCheck = query.isSafeCheck();
     }
 
     public Query page(int page){

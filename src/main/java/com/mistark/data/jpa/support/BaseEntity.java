@@ -31,7 +31,7 @@ public class BaseEntity {
     @CreateDate
     @Column
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss.SSS")
     private Date createDate;
 
     @UpdateBy
@@ -42,7 +42,7 @@ public class BaseEntity {
     @UpdateDate
     @Column
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss.SSS")
     private Date updateDate;
 
     @Version

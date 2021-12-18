@@ -3,7 +3,6 @@ package com.mistark.data.jpa.builder;
 
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
-import com.mistark.data.jpa.meta.EntityMeta.*;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.executor.keygen.KeyGenerator;
 import org.apache.ibatis.mapping.*;

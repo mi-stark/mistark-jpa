@@ -9,6 +9,11 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Table {
     String name() default "";
+    String alias() default ALIAS_DEFAULT;
     Join[] joins() default {};
     OrderBy[] orderBys() default {};
+    String[] groupBys() default {};
+
+    String ALIAS_DEFAULT = "T0";
+    String ID_DEFAULT = "id";
 }

@@ -1,17 +1,16 @@
-package com.mistark.data.jpa.builder.parser;
+package com.mistark.data.jpa.parser;
 
 import com.mistark.data.jpa.builder.JpaMethodParser;
-import com.mistark.data.jpa.builder.ParserHelper;
-import com.mistark.data.jpa.meta.EntityMeta;
+import com.mistark.data.jpa.helper.ParserHelper;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
 import org.apache.ibatis.mapping.SqlCommandType;
 import org.apache.ibatis.mapping.SqlSource;
 import org.springframework.stereotype.Component;
 
 @Component
-public class QueryList extends JpaMethodParser {
+public class QueryById extends JpaMethodParser {
 
-    private final String TPL = "<script> SELECT %s FROM %s %s %s %s</script>";
+    private final String TPL = "<script> SELECT %s FROM %s %s %s WHERE %s = #{%s} </script>";
 
     @Override
     protected void buildStatement() {
@@ -19,14 +18,15 @@ public class QueryList extends JpaMethodParser {
                 TPL,
                 ParserHelper.getSelectItems(meta),
                 meta.getTable(),
-                EntityMeta.ALIAS,
+                meta.getTableAlias(),
                 ParserHelper.getJoinItems(meta),
-                ParserHelper.getOrderByItems(meta));
-        SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, Object.class);
+                meta.getId().getColumn(),
+                meta.getId().getName());
+        SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, meta.getEntity());
         addMappedStatement(
                 sqlSource,
                 SqlCommandType.SELECT,
-                Object.class,
+                meta.getEntity(),
                 null,
                 meta.getEntity(),
                 NoKeyGenerator.INSTANCE,
@@ -34,5 +34,4 @@ public class QueryList extends JpaMethodParser {
                 null
         );
     }
-
 }

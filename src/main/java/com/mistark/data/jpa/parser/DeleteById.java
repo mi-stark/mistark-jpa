@@ -1,4 +1,4 @@
-package com.mistark.data.jpa.builder.parser;
+package com.mistark.data.jpa.parser;
 
 import com.mistark.data.jpa.builder.JpaMethodParser;
 import com.mistark.data.jpa.helper.SoftDelHelper;

@@ -16,11 +16,11 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@Order(PluginOrder.INSERT)
+@Order(PluginOrders.INSERT)
 public class JpaInsertPlugin implements JpaPlugin {
 
     @Resource
@@ -40,7 +40,7 @@ public class JpaInsertPlugin implements JpaPlugin {
         EntityMeta meta = EntityHelper.fromStatement(ms);
         if(meta == null || (!meta.getEntity().equals(pi.getClass()) && !(pi instanceof Map))) return;
         MetaObject metaObject = SystemMetaObject.forObject(pi);
-        Map<EntityField, Object> metaValue = new ConcurrentHashMap<>();
+        Map<EntityField, Object> metaValue = new HashMap<>();
 
         if(meta.getId()!=null){
             Object id = metaObject.getValue(meta.getId().getName());

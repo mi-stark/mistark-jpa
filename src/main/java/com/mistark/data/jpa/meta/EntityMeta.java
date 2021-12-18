@@ -15,13 +15,12 @@ import java.util.Map;
 @Getter
 public class EntityMeta {
 
-    public final static String ALIAS = "T0";
-    public final static String ID_KEY_DEFAULT = "id";
-
     private Class entity;
     private String table;
+    private String tableAlias;
     private List<TableJoin> joins;
     private List<TableOrderBy> orderBys;
+    private List<String> groupBys;
     private EntityField id;
     private EntityField createBy;
     private EntityField createDate;
@@ -44,12 +43,33 @@ public class EntityMeta {
         return softDel!=null;
     }
 
+    public EntityMeta clone(){
+        EntityMeta meta = new EntityMeta();
+        meta.setEntity(entity);
+        meta.setTable(table);
+        meta.setTableAlias(tableAlias);
+        meta.setJoins(joins);
+        meta.setOrderBys(orderBys);
+        meta.setGroupBys(groupBys);
+        meta.setId(id);
+        meta.setCreateBy(createBy);
+        meta.setCreateDate(createDate);
+        meta.setUpdateBy(updateBy);
+        meta.setUpdateDate(updateDate);
+        meta.setSoftDel(softDel);
+        meta.setTenantId(tenantId);
+        meta.setVersion(version);
+        meta.setFields(fields);
+        return meta;
+    }
+
+
     @Setter
     @Getter
     public static class EntityField {
         private String name;
         private String column;
-        private String table;
+        private String tableAlias;
         private Class<?> javaType;
         private String pattern;
     }
@@ -57,10 +77,9 @@ public class EntityMeta {
     @Getter
     @Setter
     public static class TableJoin {
-        private Class entity;
+        private String table;
         private String alias;
-        private String onLeft;
-        private String onRight;
+        private String on;
         private JoinType joinType;
     }
 
@@ -70,4 +89,5 @@ public class EntityMeta {
         private String field;
         private SortType sortType;
     }
+
 }

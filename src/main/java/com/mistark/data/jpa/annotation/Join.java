@@ -9,9 +9,8 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Join {
-    Class entity();
+    String table();
     String alias();
-    String onLeft();
-    String onRight();
+    String on();
     JoinType joinType() default JoinType.LEFT;
 }

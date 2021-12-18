@@ -3,6 +3,8 @@ package com.mistark.data.jpa.helper;
 import com.mistark.meta.Value;
 import net.sf.jsqlparser.expression.Alias;
 import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.Parenthesis;
+import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
@@ -10,6 +12,8 @@ import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectExpressionItem;
 import net.sf.jsqlparser.statement.select.SelectItem;
+import net.sf.jsqlparser.statement.update.Update;
+import net.sf.jsqlparser.statement.update.UpdateSet;
 import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -32,8 +36,12 @@ public class PluginHelper {
 
     public static PlainSelect getPlainSelect(String sql) throws Throwable {
         Statement statement = CCJSqlParserUtil.parse(sql);
-        PlainSelect plainSelect = (PlainSelect)((Select)statement).getSelectBody();
-        return plainSelect;
+        return (PlainSelect)((Select)statement).getSelectBody();
+    }
+
+    public static Update getUpdate(String sql) throws Throwable {
+        Statement statement = CCJSqlParserUtil.parse(sql);
+        return (Update) statement;
     }
 
     public static Map<String, Column> getColumns(PlainSelect plainSelect) {
@@ -50,6 +58,26 @@ public class PluginHelper {
             columns.put(field, column);
         });
         return columns;
+    }
+
+    public static Map<String, Expression> getUpdateSets(List<UpdateSet> updateSets){
+        Map<String, Expression> expressionMap = new HashMap<>();
+        updateSets.stream().forEach(updateSet -> {
+            Column column =  updateSet.getColumns().get(0);
+            Expression expression =  updateSet.getExpressions().get(0);
+            expressionMap.put(column.getColumnName(), expression);
+        });
+        return expressionMap;
+    }
+
+    public static Expression mergeWhereItems(List<Expression> whereItems){
+        Expression target = null;
+        for (Expression exp : whereItems){
+            if(exp==null) continue;
+            exp = new Parenthesis(exp);
+            target = target==null ? exp : new AndExpression(target, exp);
+        }
+        return target;
     }
 
     public static String getMarkedName(String name){

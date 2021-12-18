@@ -5,11 +5,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target({ElementType.TYPE,
-        ElementType.FIELD,
-        ElementType.METHOD})
+@Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface SoftDel {
-    String field() default "";
-    boolean enable() default true;
+public @interface GroupBy {
 }

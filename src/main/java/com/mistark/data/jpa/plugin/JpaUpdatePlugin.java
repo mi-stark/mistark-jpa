@@ -1,11 +1,11 @@
 package com.mistark.data.jpa.plugin;
 
+import com.mistark.data.jpa.annotation.*;
 import com.mistark.data.jpa.helper.ConvertHelper;
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.helper.PluginHelper;
 import com.mistark.data.jpa.helper.SoftDelHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
-import com.mistark.data.jpa.support.TenantIdService;
 import com.mistark.meta.time.Clock;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
@@ -36,6 +36,7 @@ public class JpaUpdatePlugin implements JpaPlugin {
         vars.param = boundSql.getParameterObject();
         vars.addon = new HashMap<>();
         vars.meta = EntityHelper.fromStatement(ms);
+        vars.isSoftDel = SoftDelHelper.isSoftDel(ms);
         try {
             vars.update = PluginHelper.getUpdate(PluginHelper.getMarkedSql(boundSql));
         }catch (Throwable e){}
@@ -43,35 +44,12 @@ public class JpaUpdatePlugin implements JpaPlugin {
         return vars;
     }
 
-    private Expression parseSoftDel(UpdateVars vars){
-        if(!vars.meta.isSoftDel()) return null;
-        String key = PluginHelper.getParamName();
-        EqualsTo equalsTo = new EqualsTo();
-        Column column = new Column(vars.meta.getSoftDel().getColumn());
-        equalsTo.setLeftExpression(column);
-        equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
-        vars.addon.put(key, SoftDelHelper.getValue(false, vars.meta));
-        return equalsTo;
-    }
-
-    private Expression parseTenant(UpdateVars vars){
-        TenantIdService tenantIdService = pluginConfig.getTenantIdService();
-        if(tenantIdService==null || vars.meta.getTenantId()==null) return null;
-        String key = PluginHelper.getParamName();
-        EqualsTo equalsTo = new EqualsTo();
-        Column column = new Column(vars.meta.getTenantId().getColumn());
-        equalsTo.setLeftExpression(column);
-        equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
-        vars.addon.put(key, tenantIdService.getTenantId());
-        return equalsTo;
-    }
-
     private Expression parseVersion(UpdateVars vars){
-        if(vars.meta.getVersion()==null) return null;
+        if(!vars.meta.hasAnnoField(Version.class)) return null;
         String key = PluginHelper.getParamName();
-        Object oldVersion = vars.metaObject.getValue(vars.meta.getVersion().getName());
+        Object oldVersion = vars.metaObject.getValue(vars.meta.annoFieldName(Version.class));
         EqualsTo equalsTo = new EqualsTo();
-        Column column = new Column(vars.meta.getVersion().getColumn());
+        Column column = new Column(vars.meta.annoFieldColumn(Version.class));
         equalsTo.setLeftExpression(column);
         equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
         vars.addon.put(key, oldVersion);
@@ -81,11 +59,13 @@ public class JpaUpdatePlugin implements JpaPlugin {
     private void patchWhere(UpdateVars vars){
         Update update = vars.update;
         List<Expression> whereItems = new ArrayList<>();
-        whereItems.add(vars.update.getWhere());
-        whereItems.add(parseSoftDel(vars));
-        whereItems.add(parseTenant(vars));
-        whereItems.add(parseVersion(vars));
-        update.setWhere(PluginHelper.mergeWhereItems(whereItems));
+        whereItems.add(update.getWhere());
+        whereItems.add(PluginHelper.parseSoftDel(vars.meta, vars.addon));
+        whereItems.add(PluginHelper.parseTenant(vars.meta, vars.addon, pluginConfig));
+        if(!vars.isSoftDel){
+            whereItems.add(parseVersion(vars));
+        }
+        update.setWhere(PluginHelper.mergeWhere(whereItems));
     }
 
     private void patchParam(UpdateVars vars){
@@ -99,22 +79,27 @@ public class JpaUpdatePlugin implements JpaPlugin {
         Map<EntityMeta.EntityField, Object> metaValue = new HashMap<>();
 
         Date now = Clock.currentDate();
-        if(meta.getUpdateDate()!=null){
-            metaValue.put(meta.getUpdateDate(), now);
+        if(meta.hasAnnoField(UpdateDate.class)){
+            metaValue.put(meta.annoField(UpdateDate.class), now);
         }
 
-        if(meta.getVersion()!=null){
-            Number old = (Number)metaObject.getValue(meta.getVersion().getName());
+        if(meta.hasAnnoField(Version.class)){
+            Number old = (Number)metaObject.getValue(meta.annoFieldName(Version.class));
             Object version = old == null ? now.getTime() : old.longValue() + 1;
-            metaValue.put(meta.getVersion(), version);
+            metaValue.put(meta.annoField(Version.class), version);
         }
 
-        if(pluginConfig.getUserIdService()!=null){
-            Object userId = pluginConfig.getUserIdService().getUserId();
-            if(meta.getUpdateBy()!=null){
-                metaValue.put(meta.getUpdateBy(), userId);
+        if(pluginConfig.hasUser()){
+            Object userId = pluginConfig.getUserId();
+            if(meta.hasAnnoField(UpdateBy.class)){
+                metaValue.put(meta.annoField(UpdateBy.class), userId);
             }
         }
+        
+        if(vars.isSoftDel && meta.hasAnnoField(SoftDel.class)){
+            metaValue.put(meta.annoField(SoftDel.class), SoftDelHelper.getValue(true, meta));
+        }
+        
         List<UpdateSet> updateSets = update.getUpdateSets();
         Map<String, Expression> updateSetMap = PluginHelper.getUpdateSets(updateSets);
         metaValue.entrySet().forEach( entry -> {
@@ -135,7 +120,7 @@ public class JpaUpdatePlugin implements JpaPlugin {
 
     @Override
     public boolean match(MappedStatement ms, BoundSql boundSql) {
-        return ms.getSqlCommandType() == SqlCommandType.UPDATE && !SoftDelHelper.isSoftDel(ms);
+        return ms.getSqlCommandType() == SqlCommandType.UPDATE;
     }
 
     @Override
@@ -155,5 +140,6 @@ public class JpaUpdatePlugin implements JpaPlugin {
         private Update update;
         private Map<String, Object> addon;
         private MetaObject metaObject;
+        private boolean isSoftDel;
     }
 }

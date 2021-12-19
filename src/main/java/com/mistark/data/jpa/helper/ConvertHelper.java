@@ -8,6 +8,10 @@ import java.util.Date;
 public class ConvertHelper {
 
     public static Object convert(Object value, final Class<?> targetType, String...patterns) {
+        if (value == null) return null;
+        if(targetType.isAssignableFrom(value.getClass())){
+            return targetType.cast(value);
+        }
         if(targetType.isAssignableFrom(Date.class)){
             DateConverter dateConverter = new DateConverter();
             dateConverter.setPatterns(patterns);

@@ -1,5 +1,6 @@
 package com.mistark.data.jpa.plugin;
 
+import com.mistark.data.jpa.annotation.*;
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.helper.SoftDelHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
@@ -42,47 +43,47 @@ public class JpaInsertPlugin implements JpaPlugin {
         MetaObject metaObject = SystemMetaObject.forObject(pi);
         Map<EntityField, Object> metaValue = new HashMap<>();
 
-        if(meta.getId()!=null){
-            Object id = metaObject.getValue(meta.getId().getName());
+        if(meta.hasAnnoField(Id.class)){
+            Object id = metaObject.getValue(meta.annoFieldName(Id.class));
             if(id == null){
-                id = Number.class.isAssignableFrom(meta.getId().getJavaType())
+                id = Number.class.isAssignableFrom(meta.annoFieldType(Id.class))
                         ? idGenerator.nextId()
                         : idGenerator.nextUUID();
-                metaValue.put(meta.getId(), id);
+                metaValue.put(meta.annoField(Id.class), id);
             }
         }
 
         Date now = Clock.currentDate();
-        if(meta.getCreateDate()!=null){
-            metaValue.put(meta.getCreateDate(), now);
+        if(meta.hasAnnoField(CreateDate.class)){
+            metaValue.put(meta.annoField(CreateDate.class), now);
         }
         
-        if(meta.getUpdateDate()!=null){
-            metaValue.put(meta.getUpdateDate(), now);
+        if(meta.hasAnnoField(UpdateDate.class)){
+            metaValue.put(meta.annoField(UpdateDate.class), now);
         }
         
-        if(meta.getVersion()!=null){
-            metaValue.put(meta.getVersion(), 0);
+        if(meta.hasAnnoField(Version.class)){
+            metaValue.put(meta.annoField(Version.class), 0);
         }
 
         if(meta.isSoftDel()){
-            metaValue.put(meta.getSoftDel(), SoftDelHelper.getValue(false, meta));
+            metaValue.put(meta.annoField(SoftDel.class), SoftDelHelper.getValue(false, meta));
         }
 
-        if(pluginConfig.getUserIdService()!=null){
-            Object userId = pluginConfig.getUserIdService().getUserId();
-            if(meta.getCreateBy()!=null){
-                metaValue.put(meta.getCreateBy(), userId);
+        if(pluginConfig.hasUser()){
+            Object userId = pluginConfig.getUserId();
+            if(meta.hasAnnoField(CreateBy.class)){
+                metaValue.put(meta.annoField(CreateBy.class), userId);
             }
-            if(meta.getUpdateBy()!=null){
-                metaValue.put(meta.getUpdateBy(), userId);
+            if(meta.hasAnnoField(UpdateBy.class)){
+                metaValue.put(meta.annoField(UpdateBy.class), userId);
             }
         }
         
-        if(pluginConfig.getTenantIdService()!=null){
-            Object tenantId = pluginConfig.getTenantIdService().getTenantId();
-            if(meta.getTenantId()!=null){
-                metaValue.put(meta.getTenantId(), tenantId);
+        if(pluginConfig.hasTenant()){
+            Object tenantId = pluginConfig.getTenantId();
+            if(meta.hasAnnoField(TenantId.class)){
+                metaValue.put(meta.annoField(TenantId.class), tenantId);
             }
         }
 

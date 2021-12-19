@@ -1,5 +1,7 @@
 package com.mistark.data.jpa.helper;
 
+import com.mistark.data.jpa.annotation.Id;
+import com.mistark.data.jpa.annotation.SoftDel;
 import com.mistark.data.jpa.annotation.SortType;
 import com.mistark.data.jpa.meta.EntityMeta;
 import com.mistark.data.jpa.meta.EntityMeta.*;
@@ -73,7 +75,7 @@ public class ParserHelper {
 
     public static boolean isInsertExclude(EntityField f, EntityMeta meta){
         return !f.getTableAlias().equals(meta.getTableAlias())
-                || f==meta.getSoftDel();
+                || f==meta.annoField(SoftDel.class);
     }
 
     public static String getInsertItems(EntityMeta meta){
@@ -83,7 +85,7 @@ public class ParserHelper {
             items.add(f.getColumn());
         });
         if(meta.isSoftDel()){
-            items.add(meta.getSoftDel().getColumn());
+            items.add(meta.annoField(SoftDel.class).getColumn());
         }
         return items.stream().collect(Collectors.joining(","));
     }
@@ -95,15 +97,15 @@ public class ParserHelper {
             values.add(String.format("#{%s}", f.getName()));
         });
         if(meta.isSoftDel()){
-            values.add(String.format("#{%s}", meta.getSoftDel().getName()));
+            values.add(String.format("#{%s}", meta.annoField(SoftDel.class).getName()));
         }
         return values.stream().collect(Collectors.joining(","));
     }
 
     public static boolean isUpdateExclude(EntityField f, EntityMeta meta){
         return !f.getTableAlias().equals(meta.getTableAlias())
-                || f == meta.getId()
-                || f == meta.getSoftDel();
+                || f == meta.annoField(Id.class)
+                || f == meta.annoField(SoftDel.class);
     }
 
     public static String getUpdateItems(EntityMeta meta){

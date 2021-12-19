@@ -2,12 +2,8 @@ package com.mistark.data.jpa.helper;
 
 import com.mistark.data.jpa.meta.Query;
 import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
-import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
 import net.sf.jsqlparser.expression.operators.relational.*;
 
-import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -31,8 +27,6 @@ public class QueryHelper {
         put(Query.NOT_NULL, IsNullExpression.class);
         put(Query.IN, InExpression.class);
         put(Query.NOT_IN, InExpression.class);
-        put(Query.LogicOperator.AND.name(), AndExpression.class);
-        put(Query.LogicOperator.OR.name(), OrExpression.class);
     }};
 
     private final static Map<String,String> LIKE_TPL = new ConcurrentHashMap<String, String>(){{

@@ -1,5 +1,7 @@
 package com.mistark.data.jpa.parser;
 
+import com.mistark.data.jpa.annotation.Id;
+import com.mistark.data.jpa.annotation.SoftDel;
 import com.mistark.data.jpa.builder.JpaMethodParser;
 import com.mistark.data.jpa.helper.SoftDelHelper;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
@@ -11,7 +13,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class DeleteById extends JpaMethodParser {
     private String TPL = "<script> DELETE FROM %s WHERE %s = #{%s} </script>";
-    private String SOFT_DEL_TPL = "<script> UPDATE %s SET %s = '%s' WHERE %s = #{%s} AND %s = '%s' </script>";
+    private String SOFT_DEL_TPL = "<script> UPDATE %s SET %s = #{%s} WHERE %s = #{%s} </script>";
 
     @Override
     protected void buildStatement() {
@@ -21,18 +23,16 @@ public class DeleteById extends JpaMethodParser {
             script = String.format(
                     SOFT_DEL_TPL,
                     meta.getTable(),
-                    meta.getSoftDel().getColumn(),
-                    SoftDelHelper.getValue(true, meta.getSoftDel().getJavaType()),
-                    meta.getId().getColumn(),
-                    meta.getId().getName(),
-                    meta.getSoftDel().getColumn(),
-                    SoftDelHelper.getValue(false, meta.getSoftDel().getJavaType()));
+                    meta.annoFieldColumn(SoftDel.class),
+                    meta.annoFieldName(SoftDel.class),
+                    meta.annoFieldColumn(Id.class),
+                    meta.annoFieldName(Id.class));
         }else {
             script = String.format(
                     TPL,
                     meta.getTable(),
-                    meta.getId().getColumn(),
-                    meta.getId().getName());
+                    meta.annoFieldColumn(Id.class),
+                    meta.annoFieldName(Id.class));
         }
         SqlCommandType sqlCommandType = isSoft ? SqlCommandType.UPDATE : SqlCommandType.DELETE;
         SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, meta.getEntity());

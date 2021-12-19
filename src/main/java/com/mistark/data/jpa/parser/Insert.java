@@ -1,5 +1,6 @@
 package com.mistark.data.jpa.parser;
 
+import com.mistark.data.jpa.annotation.Id;
 import com.mistark.data.jpa.builder.JpaMethodParser;
 import com.mistark.data.jpa.helper.ParserHelper;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
@@ -27,8 +28,8 @@ public class Insert extends JpaMethodParser {
                 null,
                 Integer.class,
                 new NoKeyGenerator(),
-                meta.getId().getName(),
-                meta.getId().getColumn()
+                meta.annoFieldColumn(Id.class),
+                meta.annoFieldName(Id.class)
         );
     }
 }

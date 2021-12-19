@@ -1,5 +1,6 @@
 package com.mistark.data.jpa.parser;
 
+import com.mistark.data.jpa.annotation.Id;
 import com.mistark.data.jpa.builder.JpaMethodParser;
 import com.mistark.data.jpa.helper.ParserHelper;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
@@ -18,8 +19,8 @@ public class UpdateById extends JpaMethodParser {
                 TPL,
                 meta.getTable(),
                 ParserHelper.getUpdateItems(meta),
-                meta.getId().getColumn(),
-                meta.getId().getName());
+                meta.annoFieldColumn(Id.class),
+                meta.annoFieldName(Id.class));
         SqlSource sqlSource = languageDriver.createSqlSource(configuration, script, meta.getEntity());
         addMappedStatement(
                 sqlSource,

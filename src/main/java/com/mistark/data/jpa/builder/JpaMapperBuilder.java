@@ -1,11 +1,10 @@
 package com.mistark.data.jpa.builder;
 
 import com.mistark.data.jpa.annotation.BindParser;
-import com.mistark.data.jpa.annotation.SoftDel;
 import com.mistark.data.jpa.helper.EntityHelper;
 import com.mistark.data.jpa.helper.SoftDelHelper;
 import com.mistark.data.jpa.meta.EntityMeta;
-import org.apache.ibatis.builder.BuilderException;
+import lombok.SneakyThrows;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.session.Configuration;
@@ -31,30 +30,27 @@ public class JpaMapperBuilder {
         this.methodParsers = methodParsers;
     }
 
-    public void parse(){
+    @SneakyThrows
+    public void parse() {
         if(CollectionUtils.isEmpty(methodParsers)) return;
         for (Method method : type.getMethods()) {
             if(method.isDefault()) continue;
             String id = getId(type, method);
             if(hasStatement(id)){
                 MappedStatement ms = configuration.getMappedStatement(id);
-                EntityMeta meta = EntityHelper.fromMethod(type, method);
+                Class alternate = EntityHelper.getEntityFromStatement(ms);
+                EntityMeta meta = EntityHelper.fromMethod(type, method, alternate);
                 if(meta.isSoftDel()) {
                     SoftDelHelper.addSoftDelStatement(ms);
                 }
                 continue;
             }
-            BindParser bindParser = method.getAnnotation(BindParser.class);
-            JpaMethodParser parser;
-            if(bindParser!=null){
-                parser = methodParsers.get(bindParser.value().hashCode());
-                if(parser == null){
-                    throw new BuilderException(String.format("No corresponding method parser found for %s", bindParser.getClass().getName()));
-                }
-            }else {
-                parser = methodParsers.get(method.getName().hashCode());
-            }
-            if(parser!=null) parser.parse(configuration, assistant, type, method);
+            BindParser bindParser = AnnotationUtils.getAnnotation(method, BindParser.class);
+            JpaMethodParser parser = bindParser!=null
+                    ? bindParser.value().newInstance()
+                    : methodParsers.get(method.getName().hashCode());
+            if(parser==null) continue;
+            parser.parse(configuration, assistant, type, method);
         }
     }
 

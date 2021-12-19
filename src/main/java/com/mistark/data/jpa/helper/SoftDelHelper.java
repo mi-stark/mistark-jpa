@@ -2,8 +2,6 @@ package com.mistark.data.jpa.helper;
 
 import com.mistark.data.jpa.annotation.SoftDel;
 import com.mistark.data.jpa.meta.EntityMeta;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.MappedStatement;
 
 import java.util.*;
@@ -52,28 +50,10 @@ public class SoftDelHelper {
     }
 
     public static Object getValue(boolean flag, EntityMeta meta){
-        return getValue(flag, meta.getSoftDel().getJavaType());
+        return getValue(flag, meta.annoFieldType(SoftDel.class));
     }
 
     public static Object getValue(boolean flag, Class type){
         return  (flag ? ValidVals: InValidVals).get(type);
-    }
-
-    public static void checkSoftDel(SoftDel annoSoftDel, EntityMeta meta){
-        if(annoSoftDel!=null){
-            if(annoSoftDel.enable()){
-                EntityMeta.EntityField softDel = meta.resolve(annoSoftDel.field());
-                if(softDel == null){
-                    throw new BuilderException(String.format("No column found with field name \"%s\" for soft delete", annoSoftDel.field()));
-                }else {
-                    meta.setSoftDel(softDel);
-                }
-            }else {
-                meta.setSoftDel(null);
-            }
-        }
-        if(meta.isSoftDel() && !ValidVals.containsKey(meta.getSoftDel().getJavaType())){
-            throw new BuilderException("Wrong type for soft delete ：" + meta.getSoftDel().getJavaType().getName());
-        }
     }
 }

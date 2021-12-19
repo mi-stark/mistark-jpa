@@ -2,6 +2,7 @@ package com.mistark.data.jpa.helper;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mistark.data.jpa.annotation.*;
+import com.mistark.data.jpa.meta.AnnoField;
 import com.mistark.data.jpa.meta.EntityMeta;
 import com.mistark.data.jpa.meta.EntityMeta.*;
 import com.mistark.meta.Value;
@@ -9,8 +10,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.MappedStatement;
-import org.apache.ibatis.reflection.MetaObject;
-import org.apache.ibatis.reflection.SystemMetaObject;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.annotation.Annotation;
@@ -82,34 +81,10 @@ public class EntityHelper {
             tableAlias = StringUtils.isEmpty(tableAlias) ? Table.ALIAS_DEFAULT : tableAlias;
             meta.setTable(table);
             meta.setTableAlias(tableAlias);
-            Map<String, EntityField> fieldMap = new HashMap<>();
-            meta.setFields(fieldMap);
-            Map<Class, EntityField> annoFieldMap = new HashMap<>();
-            Class[] annoTypes = new Class[]{
-                    Id.class,
-                    TenantId.class,
-                    CreateBy.class,
-                    CreateDate.class,
-                    UpdateBy.class,
-                    UpdateDate.class,
-                    SoftDel.class,
-                    Version.class
-            };
             FieldUtils.getAllFieldsList(entity).forEach(fl -> {
                 Column annoColumn = AnnotationUtils.getAnnotation(fl, Column.class);
                 if(annoColumn == null) return;
                 EntityField field = new EntityField();
-                Arrays.stream(annoTypes).anyMatch(type -> {
-                    Annotation anno = AnnotationUtils.getAnnotation(fl, type);
-                    if(anno!=null) {
-                        if(type.equals(SoftDel.class) && !((SoftDel)anno).enable()){
-                            return false;
-                        }
-                        annoFieldMap.put(type, field);
-                        return true;
-                    }
-                    return false;
-                });
                 OrderBy orderBy = AnnotationUtils.getAnnotation(fl, OrderBy.class);
                 if(orderBy!=null && !orderByMap.containsKey(fl.getName())){
                     TableOrderBy tableOrderBy = new TableOrderBy();
@@ -127,19 +102,24 @@ public class EntityHelper {
                 column = !StringUtils.isEmpty(column) ? column : StringHelper.toUnderline(fl.getName()).toLowerCase();
                 String columnTableAlias = annoColumn.tableAlias().trim();
                 columnTableAlias = StringUtils.isEmpty(columnTableAlias) ? meta.getTableAlias() : columnTableAlias;
-
                 field.setName(fl.getName());
                 field.setColumn(column);
                 field.setTableAlias(columnTableAlias);
                 field.setJavaType(fl.getType());
                 field.setPattern(pattern);
-                fieldMap.put(field.getName(), field);
+                meta.addField(field);
+                AnnoFieldHelper.anyMatch(annoType -> {
+                    Annotation anno = AnnotationUtils.getAnnotation(fl, annoType);
+                    if(anno==null) return false;
+                    AnnoField annoField = new AnnoField(anno, annoType);
+                    if(!annoField.isEnabled()) return false;
+                    annoField.setEntityField(field);
+                    annoField.checkType();
+                    meta.addAnnoField(annoType, field);
+                    return true;
+                });
             });
-            MetaObject metaObject = SystemMetaObject.forObject(meta);
-            Arrays.stream(annoTypes).forEach(anno -> {
-                String key = StringUtils.uncapitalize(anno.getSimpleName());
-                metaObject.setValue(key, annoFieldMap.get(anno));
-            });
+
             if(orderByMap.size()>0){
                 meta.setOrderBys(orderByMap.values().stream().collect(Collectors.toList()));
             }
@@ -147,29 +127,7 @@ public class EntityHelper {
             if(groupBys.size()>0){
                 meta.setGroupBys(groupBys.stream().collect(Collectors.toList()));
             }
-
-            if(meta.getId()==null) {
-                meta.setId(meta.resolve(Table.ID_DEFAULT));
-            }
-            if(meta.getId()!=null){
-                if(meta.getId()==meta.getSoftDel()){
-                    throw new BuilderException("ID primary key cannot be used as soft delete");
-                }
-                if(!Number.class.isAssignableFrom(meta.getId().getJavaType())
-                        || String.class.isAssignableFrom(meta.getId().getJavaType())){
-                    throw new BuilderException("Wrong type for ID primary key："+meta.getId().getJavaType().getName());
-                }
-            }else {
-                throw new BuilderException("ID primary key is required");
-            }
-
-            SoftDel annoSoftDel = AnnotationUtils.getAnnotation(entity, SoftDel.class);
-            SoftDelHelper.checkSoftDel(annoSoftDel, meta);
-
-            if(meta.getVersion()!=null && !Number.class.isAssignableFrom(meta.getVersion().getJavaType())){
-                throw new BuilderException("Wrong type for version：" + meta.getVersion().getJavaType().getName());
-            }
-
+            meta.validate();
             KnownTableNameMetas.put(meta.getTable().hashCode(), meta);
             return meta;
         });
@@ -198,13 +156,24 @@ public class EntityHelper {
         return resolve(entity.get());
     }
 
-    public static EntityMeta fromMethod(Class type, Method method){
+    public static EntityMeta fromMethod(Class type, Method method, Class ...alternate){
         BindEntity bindEntity = AnnotationUtils.getAnnotation(method, BindEntity.class);
         EntityMeta meta = bindEntity != null ? EntityHelper.resolve(bindEntity.value()) : EntityHelper.fromMapper(type);
-        SoftDel annoSoftDel = AnnotationUtils.getAnnotation(method, SoftDel.class);
-        if(meta!=null && annoSoftDel!=null) {
-            meta = meta.clone();
-            SoftDelHelper.checkSoftDel(annoSoftDel, meta);
+        if(meta==null && alternate.length>0){
+            for (Class entity : alternate){
+                if(isEntity(entity)){
+                    meta = resolve(entity);
+                    break;
+                }
+            }
+        }
+        if(meta!=null){
+            Value<EntityMeta> metaValue = new Value<>(meta);
+            meta.validate(annoType -> AnnotationUtils.getAnnotation(method, annoType), metaValue);
+            if(!meta.equals(metaValue.get())){
+                meta = metaValue.get();
+                meta.validate();
+            }
         }
         String key = type.getName() + "." + method.getName();
         KnownMethodNameMetas.put(key.hashCode(), meta);
@@ -215,25 +184,25 @@ public class EntityHelper {
         return KnownMethodNameMetas.get(name.hashCode());
     }
 
-    public static EntityMeta fromStatement(MappedStatement ms){
-        EntityMeta meta = fromMethod(ms.getId());
-        if(meta == null){
-            Class entity = null;
-            switch (ms.getSqlCommandType()){
-                case SELECT:
-                    if(ms.getResultMaps().size() > 0){
-                        entity = ms.getResultMaps().get(0).getType();
-                    }
-                    break;
-                case INSERT:
-                case UPDATE:
-                case DELETE:
-                    entity = ms.getParameterMap().getType();
-                    break;
-                default: break;
-            }
-            meta = isEntity(entity) ? resolve(entity) : null;
+    public static Class getEntityFromStatement(MappedStatement ms){
+        Class entity = null;
+        switch (ms.getSqlCommandType()){
+            case SELECT:
+                if(ms.getResultMaps().size() > 0){
+                    entity = ms.getResultMaps().get(0).getType();
+                }
+                break;
+            case INSERT:
+            case UPDATE:
+            case DELETE:
+                entity = ms.getParameterMap().getType();
+                break;
+            default: break;
         }
-        return meta;
+        return isEntity(entity) ? entity : null;
+    }
+
+    public static EntityMeta fromStatement(MappedStatement ms){
+        return fromMethod(ms.getId());
     }
 }

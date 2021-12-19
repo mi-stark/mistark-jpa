@@ -1,13 +1,21 @@
 package com.mistark.data.jpa.helper;
 
+import com.mistark.data.jpa.annotation.SoftDel;
+import com.mistark.data.jpa.annotation.TenantId;
+import com.mistark.data.jpa.annotation.Version;
+import com.mistark.data.jpa.meta.EntityMeta;
+import com.mistark.data.jpa.plugin.JpaUpdatePlugin;
+import com.mistark.data.jpa.plugin.PluginConfig;
 import com.mistark.meta.Value;
 import net.sf.jsqlparser.expression.Alias;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Parenthesis;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
+import net.sf.jsqlparser.expression.operators.relational.EqualsTo;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.schema.Column;
 import net.sf.jsqlparser.statement.Statement;
+import net.sf.jsqlparser.statement.delete.Delete;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SelectExpressionItem;
@@ -24,6 +32,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,7 +41,7 @@ public class PluginHelper {
     
     private final static String FIELD_MARK_TPL = "\"#_{%s}_#\"";
     private final static String FIELD_MARK_REG = "\"#_\\{([\\S]+)\\}_#\"";
-    private static long seed = 0;
+    private final static AtomicLong seed = new AtomicLong(0);
 
     public static PlainSelect getPlainSelect(String sql) throws Throwable {
         Statement statement = CCJSqlParserUtil.parse(sql);
@@ -43,6 +52,13 @@ public class PluginHelper {
         Statement statement = CCJSqlParserUtil.parse(sql);
         return (Update) statement;
     }
+
+    public static Delete getDelete(String sql) throws Throwable {
+        Statement statement = CCJSqlParserUtil.parse(sql);
+        return (Delete) statement;
+    }
+    
+    
 
     public static Map<String, Column> getColumns(PlainSelect plainSelect) {
         Map<String, Column> columns = new ConcurrentHashMap<>();
@@ -70,7 +86,7 @@ public class PluginHelper {
         return expressionMap;
     }
 
-    public static Expression mergeWhereItems(List<Expression> whereItems){
+    public static Expression mergeWhere(List<Expression> whereItems){
         Expression target = null;
         for (Expression exp : whereItems){
             if(exp==null) continue;
@@ -89,7 +105,7 @@ public class PluginHelper {
     }
 
     public static String getParamName(){
-        return String.format("_sp_%s", ++seed);
+        return String.format("_sp_%s", seed.addAndGet(1L));
     }
 
     public static String getMarkedSql(BoundSql boundSql){
@@ -113,6 +129,28 @@ public class PluginHelper {
     public static MappedStatement getMappedStatement(StatementHandler statementHandler) {
         MetaObject metaObject = SystemMetaObject.forObject(statementHandler);
         return (MappedStatement) metaObject.getValue("delegate.mappedStatement");
+    }
+
+    public static EqualsTo parseTenant(EntityMeta meta, Map<String, Object> addon, PluginConfig config){
+        if(!config.hasTenant() || !meta.hasAnnoField(TenantId.class)) return null;
+        String key = getParamName();
+        EqualsTo equalsTo = new EqualsTo();
+        Column column = new Column(meta.annoFieldColumn(TenantId.class));
+        equalsTo.setLeftExpression(column);
+        equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
+        addon.put(key, config.getTenantId());
+        return equalsTo;
+    }
+
+    public static EqualsTo parseSoftDel(EntityMeta meta, Map<String, Object> addon){
+        if(!meta.isSoftDel()) return null;
+        String key = PluginHelper.getParamName();
+        EqualsTo equalsTo = new EqualsTo();
+        Column column = new Column(meta.annoFieldColumn(SoftDel.class));
+        equalsTo.setLeftExpression(column);
+        equalsTo.setRightExpression(PluginHelper.getMarkedExpression(key));
+        addon.put(key, SoftDelHelper.getValue(false, meta));
+        return equalsTo;
     }
     
     public static void updateBoundSql(MappedStatement ms, 

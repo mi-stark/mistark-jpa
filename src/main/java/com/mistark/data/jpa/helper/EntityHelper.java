@@ -50,10 +50,15 @@ public class EntityHelper {
                         tableJoin.setAlias(join.alias().trim());
                         tableJoin.setOn(join.on().trim());
                         tableJoin.setJoinType(join.joinType());
-                        String scahma = "[A-Za-z]\\w{0,3}\\.[A-Za-z]\\w{0,29}";
+                        String scahma = "([A-Za-z]\\w{0,3})\\.[A-Za-z]\\w{0,29}";
                         String pattern = String.format("^%s *= *%s$", scahma, scahma);
                         Matcher matcher = Pattern.compile(pattern).matcher(tableJoin.getOn());
-                        if(!matcher.matches()){
+                        if(matcher.matches()){
+                            if(!matcher.group(1).equalsIgnoreCase(tableJoin.getAlias())
+                                    && !matcher.group(2).equalsIgnoreCase(tableJoin.getAlias())){
+                                throw new BuilderException("No self alias in @Join.on：" + tableJoin.getAlias());
+                            }
+                        }else {
                             throw new BuilderException("Invalid value at @Join.on：" + tableJoin.getOn());
                         }
                         return tableJoin;
